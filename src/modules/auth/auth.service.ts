@@ -1,8 +1,546 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import type { StringValue } from 'ms';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { AuthRepository } from './auth.repository';
+import {
+  RegisterDto,
+  LoginDto,
+  ChangePasswordDto,
+  CreateRoleDto,
+  UpdateRoleDto,
+  CreatePermissionDto,
+  AssignPermissionsDto,
+  AssignRolesDto,
+  UpdateUserDto,
+} from './dto';
 
 @Injectable()
 export class AuthService {
-  getAuthHello(): string {
-    return 'Hello from Auth Service!';
+  constructor(
+    private readonly authRepository: AuthRepository,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  // ==================== AUTHENTICATION ====================
+  async register(registerDto: RegisterDto) {
+    // Check if username already exists
+    const existingUsername = await this.authRepository.findUserByUsername(
+      registerDto.username,
+    );
+    if (existingUsername) {
+      throw new ConflictException('Username sudah digunakan');
+    }
+
+    // Check if email already exists
+    const existingEmail = await this.authRepository.findUserByEmail(
+      registerDto.email,
+    );
+    if (existingEmail) {
+      throw new ConflictException('Email sudah digunakan');
+    }
+
+    // Hash password
+    const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') || 10;
+    const hashedPassword = await bcrypt.hash(
+      registerDto.password,
+      bcryptRounds,
+    );
+
+    // Create user
+    const user = await this.authRepository.createUser({
+      username: registerDto.username,
+      email: registerDto.email,
+      password: hashedPassword,
+    });
+
+    return {
+      message: 'Registrasi berhasil',
+      user,
+    };
+  }
+
+  async login(loginDto: LoginDto) {
+    // Find user by username or email
+    const user = await this.authRepository.findUserByUsernameOrEmail(
+      loginDto.usernameOrEmail,
+    );
+
+    if (!user) {
+      throw new UnauthorizedException('Username/email atau password salah');
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      throw new UnauthorizedException('Akun Anda tidak aktif');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Username/email atau password salah');
+    }
+
+    // Update last login
+    await this.authRepository.updateLastLogin(user.id);
+
+    // Extract roles and permissions
+    const roles = user.roles.map((ur) => ur.role.name);
+    const permissions = user.roles.flatMap((ur) =>
+      ur.role.permissions.map((rp) => rp.permission.code),
+    );
+    const uniquePermissions = [...new Set(permissions)];
+
+    // Generate tokens
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+      roles,
+      permissions: uniquePermissions,
+    };
+
+    const accessTokenExpiresIn =
+      this.configService.get<string>('jwt.accessTokenExpiresIn') || '15m';
+    const refreshTokenExpiresIn =
+      this.configService.get<string>('jwt.refreshTokenExpiresIn') || '7d';
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: accessTokenExpiresIn as StringValue,
+    });
+
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id },
+      {
+        expiresIn: refreshTokenExpiresIn as StringValue,
+      },
+    );
+
+    return {
+      message: 'Login berhasil',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        roles,
+        permissions: uniquePermissions,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    const roles = user.roles.map((ur) => ur.role.name);
+    const permissions = user.roles.flatMap((ur) =>
+      ur.role.permissions.map((rp) => rp.permission.code),
+    );
+    const uniquePermissions = [...new Set(permissions)];
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      roles,
+      permissions: uniquePermissions,
+    };
+  }
+
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    // Verify old password
+    const isOldPasswordValid = await bcrypt.compare(
+      changePasswordDto.oldPassword,
+      user.password,
+    );
+
+    if (!isOldPasswordValid) {
+      throw new BadRequestException('Password lama tidak sesuai');
+    }
+
+    // Check if new password matches confirmation
+    if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
+      throw new BadRequestException('Konfirmasi password tidak sesuai');
+    }
+
+    // Hash new password
+    const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') || 10;
+    const hashedPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      bcryptRounds,
+    );
+
+    // Update password
+    await this.authRepository.updateUserPassword(userId, hashedPassword);
+
+    return {
+      message: 'Password berhasil diubah',
+    };
+  }
+
+  async updateUser(userId: number, updateUserDto: UpdateUserDto) {
+    // Check if user exists
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    // Prepare update data
+    const updateData: {
+      username?: string;
+      email?: string;
+      password?: string;
+      isActive?: boolean;
+    } = {};
+
+    // Check if username is being updated and not already taken
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
+      const existingUser = await this.authRepository.findUserByUsername(
+        updateUserDto.username,
+      );
+      if (existingUser) {
+        throw new ConflictException('Username sudah digunakan');
+      }
+      updateData.username = updateUserDto.username;
+    }
+
+    // Check if email is being updated and not already taken
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUser = await this.authRepository.findUserByEmail(
+        updateUserDto.email,
+      );
+      if (existingUser) {
+        throw new ConflictException('Email sudah digunakan');
+      }
+      updateData.email = updateUserDto.email;
+    }
+
+    // Hash password if being updated
+    if (updateUserDto.password) {
+      const bcryptRounds =
+        this.configService.get<number>('BCRYPT_ROUNDS') || 10;
+      updateData.password = await bcrypt.hash(
+        updateUserDto.password,
+        bcryptRounds,
+      );
+    }
+
+    // Update isActive status
+    if (updateUserDto.isActive !== undefined) {
+      updateData.isActive = updateUserDto.isActive;
+    }
+
+    // Perform update
+    const updatedUser = await this.authRepository.updateUser(
+      userId,
+      updateData,
+    );
+
+    return {
+      message: 'Data user berhasil diubah',
+      data: updatedUser,
+    };
+  }
+
+  async refreshToken(userId: number) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User tidak ditemukan');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Akun Anda tidak aktif');
+    }
+
+    const roles = user.roles.map((ur) => ur.role.name);
+    const permissions = user.roles.flatMap((ur) =>
+      ur.role.permissions.map((rp) => rp.permission.code),
+    );
+    const uniquePermissions = [...new Set(permissions)];
+
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      email: user.email,
+      roles,
+      permissions: uniquePermissions,
+    };
+
+    const accessTokenExpiresIn =
+      this.configService.get<string>('jwt.accessTokenExpiresIn') || '15m';
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: accessTokenExpiresIn as StringValue,
+    });
+
+    return {
+      message: 'Token berhasil diperbarui',
+      accessToken,
+    };
+  }
+
+  // ==================== ROLE MANAGEMENT ====================
+  async createRole(createRoleDto: CreateRoleDto) {
+    // Check if role already exists
+    const existingRole = await this.authRepository.findRoleByName(
+      createRoleDto.name,
+    );
+
+    if (existingRole) {
+      throw new ConflictException('Role sudah ada');
+    }
+
+    const role = await this.authRepository.createRole(createRoleDto);
+
+    return {
+      message: 'Role berhasil dibuat',
+      role,
+    };
+  }
+
+  async getAllRoles() {
+    const roles = await this.authRepository.findAllRoles();
+
+    return {
+      message: 'Berhasil mengambil data role',
+      data: roles,
+    };
+  }
+
+  async getRoleById(id: number) {
+    const role = await this.authRepository.findRoleById(id);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    return {
+      message: 'Berhasil mengambil data role',
+      data: role,
+    };
+  }
+
+  async updateRole(id: number, updateRoleDto: UpdateRoleDto) {
+    const role = await this.authRepository.findRoleById(id);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    // Check if new name already exists (if name is being updated)
+    if (updateRoleDto.name && updateRoleDto.name !== role.name) {
+      const existingRole = await this.authRepository.findRoleByName(
+        updateRoleDto.name,
+      );
+
+      if (existingRole) {
+        throw new ConflictException('Nama role sudah digunakan');
+      }
+    }
+
+    const updatedRole = await this.authRepository.updateRole(id, updateRoleDto);
+
+    return {
+      message: 'Role berhasil diperbarui',
+      role: updatedRole,
+    };
+  }
+
+  async deleteRole(id: number) {
+    const role = await this.authRepository.findRoleById(id);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    await this.authRepository.deleteRole(id);
+
+    return {
+      message: 'Role berhasil dihapus',
+    };
+  }
+
+  // ==================== PERMISSION MANAGEMENT ====================
+  async createPermission(createPermissionDto: CreatePermissionDto) {
+    // Check if permission already exists
+    const existingPermission = await this.authRepository.findPermissionByCode(
+      createPermissionDto.code,
+    );
+
+    if (existingPermission) {
+      throw new ConflictException('Permission sudah ada');
+    }
+
+    const permission =
+      await this.authRepository.createPermission(createPermissionDto);
+
+    return {
+      message: 'Permission berhasil dibuat',
+      permission,
+    };
+  }
+
+  async getAllPermissions() {
+    const permissions = await this.authRepository.findAllPermissions();
+
+    return {
+      message: 'Berhasil mengambil data permission',
+      data: permissions,
+    };
+  }
+
+  async deletePermission(id: number) {
+    const permission = await this.authRepository.findPermissionById(id);
+
+    if (!permission) {
+      throw new NotFoundException('Permission tidak ditemukan');
+    }
+
+    await this.authRepository.deletePermission(id);
+
+    return {
+      message: 'Permission berhasil dihapus',
+    };
+  }
+
+  // ==================== ROLE-PERMISSION ASSIGNMENT ====================
+  async assignPermissionsToRole(
+    roleId: number,
+    assignPermissionsDto: AssignPermissionsDto,
+  ) {
+    const role = await this.authRepository.findRoleById(roleId);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    // Verify all permissions exist
+    for (const permissionId of assignPermissionsDto.permissionIds) {
+      const permission =
+        await this.authRepository.findPermissionById(permissionId);
+
+      if (!permission) {
+        throw new NotFoundException(
+          `Permission dengan ID ${permissionId} tidak ditemukan`,
+        );
+      }
+    }
+
+    await this.authRepository.assignPermissionsToRole(
+      roleId,
+      assignPermissionsDto.permissionIds,
+    );
+
+    return {
+      message: 'Permission berhasil di-assign ke role',
+    };
+  }
+
+  async removePermissionFromRole(roleId: number, permissionId: number) {
+    const role = await this.authRepository.findRoleById(roleId);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    const permission =
+      await this.authRepository.findPermissionById(permissionId);
+
+    if (!permission) {
+      throw new NotFoundException('Permission tidak ditemukan');
+    }
+
+    await this.authRepository.removePermissionFromRole(roleId, permissionId);
+
+    return {
+      message: 'Permission berhasil dihapus dari role',
+    };
+  }
+
+  // ==================== USER-ROLE ASSIGNMENT ====================
+  async assignRolesToUser(userId: number, assignRolesDto: AssignRolesDto) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    // Verify all roles exist
+    for (const roleId of assignRolesDto.roleIds) {
+      const role = await this.authRepository.findRoleById(roleId);
+
+      if (!role) {
+        throw new NotFoundException(`Role dengan ID ${roleId} tidak ditemukan`);
+      }
+    }
+
+    await this.authRepository.assignRolesToUser(userId, assignRolesDto.roleIds);
+
+    return {
+      message: 'Role berhasil di-assign ke user',
+    };
+  }
+
+  async removeRoleFromUser(userId: number, roleId: number) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    const role = await this.authRepository.findRoleById(roleId);
+
+    if (!role) {
+      throw new NotFoundException('Role tidak ditemukan');
+    }
+
+    await this.authRepository.removeRoleFromUser(userId, roleId);
+
+    return {
+      message: 'Role berhasil dihapus dari user',
+    };
+  }
+
+  async getUserRoles(userId: number) {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    const userRoles = await this.authRepository.getUserRoles(userId);
+
+    return {
+      message: 'Berhasil mengambil role user',
+      data: userRoles,
+    };
   }
 }
