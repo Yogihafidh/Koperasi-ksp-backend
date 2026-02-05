@@ -9,7 +9,7 @@ async function seed() {
 
   try {
     // Create Permissions
-    console.log('Creating permissions...');
+    console.log('1. Creating permissions...');
     const permissions = [
       // User permissions
       { code: 'user.create', description: 'Create user' },
@@ -71,10 +71,10 @@ async function seed() {
         create: permission,
       });
     }
-    console.log(`✅ Created ${permissions.length} permissions`);
+    console.log(`Created ${permissions.length} permissions`);
 
     // Create Roles
-    console.log('Creating roles...');
+    console.log('2. Creating roles...');
     const adminRole = await prisma.role.upsert({
       where: { name: 'Admin' },
       update: {},
@@ -111,10 +111,10 @@ async function seed() {
       },
     });
 
-    console.log('✅ Created roles: Admin, Kasir, Staff, Pimpinan');
+    console.log('Created roles: Admin, Kasir, Staff, Pimpinan');
 
     // Assign all permissions to Admin
-    console.log('Assigning permissions to Admin role...');
+    console.log('3.1 Assigning permissions to Admin role...');
     const allPermissions = await prisma.permission.findMany();
     await prisma.rolePermission.deleteMany({
       where: { roleId: adminRole.id },
@@ -125,10 +125,10 @@ async function seed() {
         permissionId: p.id,
       })),
     });
-    console.log(`✅ Assigned ${allPermissions.length} permissions to Admin`);
+    console.log(`Assigned ${allPermissions.length} permissions to Admin`);
 
     // Assign specific permissions to Kasir
-    console.log('Assigning permissions to Kasir role...');
+    console.log('3.2 Assigning permissions to Kasir role...');
     const kasirPermissionCodes = [
       'nasabah.read',
       'simpanan.create',
@@ -149,10 +149,10 @@ async function seed() {
         permissionId: p.id,
       })),
     });
-    console.log(`✅ Assigned ${kasirPermissions.length} permissions to Kasir`);
+    console.log(`Assigned ${kasirPermissions.length} permissions to Kasir`);
 
     // Assign specific permissions to Staff
-    console.log('Assigning permissions to Staff role...');
+    console.log('3.3 Assigning permissions to Staff role...');
     const staffPermissionCodes = [
       'nasabah.create',
       'nasabah.read',
@@ -176,10 +176,10 @@ async function seed() {
         permissionId: p.id,
       })),
     });
-    console.log(`✅ Assigned ${staffPermissions.length} permissions to Staff`);
+    console.log(`Assigned ${staffPermissions.length} permissions to Staff`);
 
     // Assign specific permissions to Pimpinan
-    console.log('Assigning permissions to Pimpinan role...');
+    console.log('3.4 Assigning permissions to Pimpinan role...');
     const pimpinanPermissionCodes = [
       'nasabah.read',
       'pegawai.read',
@@ -205,7 +205,7 @@ async function seed() {
       })),
     });
     console.log(
-      `✅ Assigned ${pimpinanPermissions.length} permissions to Pimpinan`,
+      `Assigned ${pimpinanPermissions.length} permissions to Pimpinan`,
     );
 
     // Create default admin user
@@ -233,14 +233,13 @@ async function seed() {
       },
     });
 
-    console.log('✅ Created default admin user');
-    console.log('   Username: admin');
-    console.log('   Email: admin@koperasi.com');
-    console.log('   Password: Admin@123');
-
-    console.log('\n🎉 Auth seed completed successfully!');
+    console.log('Created default admin user');
+    console.log('Username: admin');
+    console.log('Email: admin@koperasi.com');
+    console.log('Password: Admin@123');
+    console.log('Auth seed completed successfully!');
   } catch (error) {
-    console.error('❌ Error seeding data:', error);
+    console.error('Error seeding data:', error);
     throw error;
   } finally {
     await prisma.$disconnect();

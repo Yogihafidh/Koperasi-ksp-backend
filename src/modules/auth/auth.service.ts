@@ -24,6 +24,8 @@ import {
 
 @Injectable()
 export class AuthService {
+  private readonly tokenBlacklist = new Map<string, number>();
+
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
@@ -305,6 +307,51 @@ export class AuthService {
       message: 'Token berhasil diperbarui',
       accessToken,
     };
+  }
+
+  logout(accessToken: string) {
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Token tidak valid atau sudah kedaluwarsa',
+      );
+    }
+
+    const decoded = this.jwtService.decode(accessToken) as {
+      exp?: number;
+    } | null;
+
+    if (!decoded?.exp) {
+      throw new UnauthorizedException(
+        'Token tidak valid atau sudah kedaluwarsa',
+      );
+    }
+
+    const expiresAtMs = decoded.exp * 1000;
+    if (expiresAtMs <= Date.now()) {
+      throw new UnauthorizedException(
+        'Token tidak valid atau sudah kedaluwarsa',
+      );
+    }
+
+    this.tokenBlacklist.set(accessToken, expiresAtMs);
+
+    return {
+      message: 'Logout berhasil',
+    };
+  }
+
+  isTokenBlacklisted(accessToken: string) {
+    const expiresAt = this.tokenBlacklist.get(accessToken);
+    if (!expiresAt) {
+      return false;
+    }
+
+    if (expiresAt <= Date.now()) {
+      this.tokenBlacklist.delete(accessToken);
+      return false;
+    }
+
+    return true;
   }
 
   // ==================== ROLE MANAGEMENT ====================

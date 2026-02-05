@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserFromJwt } from '../../modules/auth/interfaces/jwt-payload.interface';
 
@@ -20,11 +25,21 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
 
     if (!user?.permissions) {
-      return false;
+      throw new ForbiddenException(
+        'Anda tidak memiliki permission untuk mengakses endpoint ini',
+      );
     }
 
-    return requiredPermissions.every((permission) =>
+    const hasPermissions = requiredPermissions.every((permission) =>
       user.permissions.includes(permission),
     );
+
+    if (!hasPermissions) {
+      throw new ForbiddenException(
+        'Anda tidak memiliki permission untuk mengakses endpoint ini',
+      );
+    }
+
+    return true;
   }
 }

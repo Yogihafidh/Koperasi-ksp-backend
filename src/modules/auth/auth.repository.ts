@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 export class AuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  // ==================== USER OPERATIONS ====================
+  // Create a new user
   async createUser(data: {
     username: string;
     email: string;
@@ -24,6 +24,7 @@ export class AuthRepository {
     });
   }
 
+  // Find users based on username
   async findUserByUsername(username: string) {
     return this.prisma.user.findUnique({
       where: { username },
@@ -45,6 +46,7 @@ export class AuthRepository {
     });
   }
 
+  // Find users based on email
   async findUserByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
@@ -66,6 +68,7 @@ export class AuthRepository {
     });
   }
 
+  // Find users based on ID
   async findUserById(id: number) {
     return this.prisma.user.findUnique({
       where: { id },
@@ -87,6 +90,7 @@ export class AuthRepository {
     });
   }
 
+  // Find users based on username or email
   async findUserByUsernameOrEmail(identifier: string) {
     return this.prisma.user.findFirst({
       where: {
@@ -110,6 +114,7 @@ export class AuthRepository {
     });
   }
 
+  // Update user password
   async updateUserPassword(userId: number, hashedPassword: string) {
     return this.prisma.user.update({
       where: { id: userId },
@@ -122,6 +127,7 @@ export class AuthRepository {
     });
   }
 
+  // Update user details
   async updateUser(
     userId: number,
     data: {
@@ -146,6 +152,7 @@ export class AuthRepository {
     });
   }
 
+  // Update last login timestamp
   async updateLastLogin(userId: number) {
     return this.prisma.user.update({
       where: { id: userId },
@@ -153,13 +160,14 @@ export class AuthRepository {
     });
   }
 
-  // ==================== ROLE OPERATIONS ====================
+  // Create a new role
   async createRole(data: { name: string; description?: string }) {
     return this.prisma.role.create({
       data,
     });
   }
 
+  // Find all roles
   async findAllRoles() {
     return this.prisma.role.findMany({
       include: {
@@ -177,6 +185,7 @@ export class AuthRepository {
     });
   }
 
+  // Find role by ID
   async findRoleById(id: number) {
     return this.prisma.role.findUnique({
       where: { id },
@@ -201,12 +210,14 @@ export class AuthRepository {
     });
   }
 
+  // Find role by name
   async findRoleByName(name: string) {
     return this.prisma.role.findUnique({
       where: { name },
     });
   }
 
+  // Update role details
   async updateRole(id: number, data: { name?: string; description?: string }) {
     return this.prisma.role.update({
       where: { id },
@@ -214,19 +225,21 @@ export class AuthRepository {
     });
   }
 
+  // Delete role
   async deleteRole(id: number) {
     return this.prisma.role.delete({
       where: { id },
     });
   }
 
-  // ==================== PERMISSION OPERATIONS ====================
+  // Create a new permission
   async createPermission(data: { code: string; description?: string }) {
     return this.prisma.permission.create({
       data,
     });
   }
 
+  // Find all permissions
   async findAllPermissions() {
     return this.prisma.permission.findMany({
       include: {
@@ -239,25 +252,28 @@ export class AuthRepository {
     });
   }
 
+  // Find permission by ID
   async findPermissionById(id: number) {
     return this.prisma.permission.findUnique({
       where: { id },
     });
   }
 
+  // Find permission by code
   async findPermissionByCode(code: string) {
     return this.prisma.permission.findUnique({
       where: { code },
     });
   }
 
+  // Delete permission
   async deletePermission(id: number) {
     return this.prisma.permission.delete({
       where: { id },
     });
   }
 
-  // ==================== ROLE-PERMISSION OPERATIONS ====================
+  // Assign permissions to role
   async assignPermissionsToRole(roleId: number, permissionIds: number[]) {
     // Delete existing permissions for the role
     await this.prisma.rolePermission.deleteMany({
@@ -275,6 +291,7 @@ export class AuthRepository {
     });
   }
 
+  // Remove permission from role
   async removePermissionFromRole(roleId: number, permissionId: number) {
     return this.prisma.rolePermission.delete({
       where: {
@@ -286,7 +303,7 @@ export class AuthRepository {
     });
   }
 
-  // ==================== USER-ROLE OPERATIONS ====================
+  // Assign roles to user
   async assignRolesToUser(userId: number, roleIds: number[]) {
     // Delete existing roles for the user
     await this.prisma.userRole.deleteMany({
@@ -304,6 +321,7 @@ export class AuthRepository {
     });
   }
 
+  // Remove role from user
   async removeRoleFromUser(userId: number, roleId: number) {
     return this.prisma.userRole.delete({
       where: {
@@ -315,6 +333,7 @@ export class AuthRepository {
     });
   }
 
+  // Get roles of a user along with their permissions
   async getUserRoles(userId: number) {
     return this.prisma.userRole.findMany({
       where: { userId },

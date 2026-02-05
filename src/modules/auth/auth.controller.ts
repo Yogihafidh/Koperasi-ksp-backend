@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
 import { Public, CurrentUser } from '../../common/decorators';
@@ -28,7 +29,7 @@ import type { UserFromJwt } from './interfaces/jwt-payload.interface';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // ==================== AUTHENTICATION ENDPOINTS ====================
+  // Registration User
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register pengguna baru' })
@@ -56,6 +57,7 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  // Login User
   @Public()
   @Post('login')
   @ApiOperation({ summary: 'Login pengguna' })
@@ -85,6 +87,7 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  // Get Profile of Logged-in User
   @Get('profile')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Mendapatkan profil pengguna yang sedang login' })
@@ -111,6 +114,7 @@ export class AuthController {
     return this.authService.getProfile(user.userId);
   }
 
+  // Change Password for Logged-in User
   @Post('change-password')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Ubah password pengguna yang sedang login' })
@@ -136,6 +140,7 @@ export class AuthController {
     return this.authService.changePassword(user.userId, changePasswordDto);
   }
 
+  // Refresh Token JWT
   @Post('refresh')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Refresh access token' })
@@ -154,5 +159,26 @@ export class AuthController {
   @ApiAuthErrors()
   refreshToken(@CurrentUser() user: UserFromJwt) {
     return this.authService.refreshToken(user.userId);
+  }
+
+  @Post('logout')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Logout pengguna' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logout berhasil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Logout berhasil',
+        },
+      },
+    },
+  })
+  @ApiAuthErrors()
+  logout(@Req() request: Request) {
+    const authHeader = request.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    return this.authService.logout(token);
   }
 }
