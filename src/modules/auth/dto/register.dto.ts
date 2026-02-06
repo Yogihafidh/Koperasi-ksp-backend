@@ -43,14 +43,4 @@ export class RegisterDto {
       'Password harus mengandung huruf besar, huruf kecil, dan angka/simbol',
   })
   password: string;
-
-  @ApiProperty({
-    description: 'Nama lengkap pengguna',
-    example: 'John Doe',
-    maxLength: 100,
-  })
-  @IsNotEmpty({ message: 'Nama lengkap tidak boleh kosong' })
-  @IsString({ message: 'Nama lengkap harus berupa string' })
-  @MaxLength(100, { message: 'Nama lengkap maksimal 100 karakter' })
-  fullName: string;
 }
