@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
+import { PegawaiModule } from './modules/pegawai/pegawai.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -14,6 +15,7 @@ import databaseConfig from './config/database.config';
       load: [appConfig, jwtConfig, databaseConfig], // Load semua config files
     }),
     AuthModule,
+    PegawaiModule,
   ],
 })
 export class AppModule {}
