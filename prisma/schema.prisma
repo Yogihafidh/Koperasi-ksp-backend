@@ -10,10 +10,10 @@ datasource db {
 model User {
   email       String            @unique
   password    String
-  createdAt   DateTime          @default(now())
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   isActive    Boolean           @default(true)
-  lastLoginAt DateTime?
-  updatedAt   DateTime          @updatedAt
+  lastLoginAt DateTime?         @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
   username    String            @unique
   id          Int               @id @default(autoincrement())
   auditTrails AuditTrail[]
@@ -64,7 +64,7 @@ model Pegawai {
   noHp               String
   alamat             String
   statusAktif        Boolean     @default(true)
-  createdAt          DateTime    @default(now())
+  createdAt          DateTime    @default(now()) @db.Timestamptz(3)
   nasabah            Nasabah[]
   user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   pinjamanVerifikasi Pinjaman[]  @relation("PinjamanVerifiedBy")
@@ -83,13 +83,13 @@ model Nasabah {
   pekerjaan          String
   instansi           String?
   penghasilanBulanan Decimal
-  tanggalLahir       DateTime
-  tanggalDaftar      DateTime
+  tanggalLahir       DateTime           @db.Timestamptz(3)
+  tanggalDaftar      DateTime           @db.Timestamptz(3)
   status             NasabahStatus
   catatan            String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  deletedAt          DateTime?          @db.Timestamptz(3)
   pegawai            Pegawai            @relation(fields: [pegawaiId], references: [id])
   user               User?              @relation(fields: [userId], references: [id])
   dokumen            NasabahDokumen[]
@@ -103,7 +103,7 @@ model NasabahDokumen {
   nasabahId    Int
   jenisDokumen JenisDokumen
   fileUrl      String
-  uploadedAt   DateTime     @default(now())
+  uploadedAt   DateTime     @default(now()) @db.Timestamptz(3)
   nasabah      Nasabah      @relation(fields: [nasabahId], references: [id], onDelete: Cascade)
 }
 
@@ -112,8 +112,8 @@ model RekeningSimpanan {
   nasabahId     Int
   jenisSimpanan JenisSimpanan
   saldoBerjalan Decimal
-  createdAt     DateTime      @default(now())
-  deletedAt     DateTime?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  deletedAt     DateTime?     @db.Timestamptz(3)
   nasabah       Nasabah       @relation(fields: [nasabahId], references: [id])
   transaksi     Transaksi[]
 }
@@ -127,8 +127,8 @@ model Pinjaman {
   sisaPinjaman       Decimal
   status             PinjamanStatus
   verifiedById       Int?
-  tanggalPersetujuan DateTime?
-  deletedAt          DateTime?
+  tanggalPersetujuan DateTime?     @db.Timestamptz(3)
+  deletedAt          DateTime?     @db.Timestamptz(3)
   nasabah            Nasabah        @relation(fields: [nasabahId], references: [id])
   verifiedBy         Pegawai?       @relation("PinjamanVerifiedBy", fields: [verifiedById], references: [id])
   transaksi          Transaksi[]
@@ -142,13 +142,13 @@ model Transaksi {
   pinjamanId         Int?
   jenisTransaksi     JenisTransaksi
   nominal            Decimal
-  tanggal            DateTime
+  tanggal            DateTime          @db.Timestamptz(3)
   metodePembayaran   String
   statusTransaksi    StatusTransaksi
   urlBuktiTransaksi  String?
   catatan            String?
-  createdAt          DateTime          @default(now())
-  deletedAt          DateTime?
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  deletedAt          DateTime?         @db.Timestamptz(3)
   nasabah            Nasabah           @relation(fields: [nasabahId], references: [id])
   pegawai            Pegawai           @relation(fields: [pegawaiId], references: [id])
   pinjaman           Pinjaman?         @relation(fields: [pinjamanId], references: [id])
@@ -168,7 +168,7 @@ model AuditTrail {
   action     AuditAction
   oldValue   Json?
   newValue   Json?
-  createdAt  DateTime    @default(now())
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
   user       User        @relation(fields: [userId], references: [id])
 
   @@index([entityName, entityId])
@@ -186,7 +186,7 @@ model LaporanKeuangan {
   saldoAkhir     Decimal
   statusLaporan  StatusLaporan
   generatedById  Int
-  generatedAt    DateTime      @default(now())
+  generatedAt    DateTime      @default(now()) @db.Timestamptz(3)
   generatedBy    User          @relation("LaporanGeneratedBy", fields: [generatedById], references: [id])
 }
 
@@ -195,7 +195,7 @@ model Setting {
   key         String   @unique
   value       String
   description String?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 }
 
 enum NasabahStatus {

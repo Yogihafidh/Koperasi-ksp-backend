@@ -5,6 +5,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  // Set timezone to Asia/Jakarta
+  process.env.TZ = 'Asia/Jakarta';
+
   const app = await NestFactory.create(AppModule);
 
   // Ambil ConfigService untuk baca config
@@ -40,6 +43,7 @@ async function bootstrap() {
     .addTag('users', 'User Management')
     .addTag('roles', 'Role Management')
     .addTag('permissions', 'Permission Management')
+    .addTag('pegawai', 'Pegawai Management')
     .addBearerAuth(
       {
         type: 'http',
@@ -68,9 +72,7 @@ async function bootstrap() {
   console.log(
     `🚀 Application is running on: http://localhost:${port}/${apiPrefix}`,
   );
-  console.log(
-    `📚 Swagger Documentation: http://localhost:${port}/api-docs`,
-  );
+  console.log(`📚 Swagger Documentation: http://localhost:${port}/api-docs`);
   console.log(`📝 Environment: ${configService.get<string>('app.nodeEnv')}`);
 }
 void bootstrap();
