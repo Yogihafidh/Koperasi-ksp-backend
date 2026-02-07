@@ -4,7 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PegawaiRepository } from './pegawai.repository';
-import { CreatePegawaiDto, UpdatePegawaiDto, TogglePegawaiStatusDto } from './dto';
+import {
+  CreatePegawaiDto,
+  UpdatePegawaiDto,
+  TogglePegawaiStatusDto,
+} from './dto';
+import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
 
 @Injectable()
 export class PegawaiService {
@@ -37,11 +42,19 @@ export class PegawaiService {
     };
   }
 
-  async getAllPegawai() {
-    const data = await this.pegawaiRepository.findAllPegawai();
+  async getAllPegawai(cursor?: number) {
+    const { data, nextCursor } = await this.pegawaiRepository.findAllPegawai(
+      cursor,
+      DEFAULT_PAGE_SIZE,
+    );
     return {
       message: 'Berhasil mengambil data pegawai',
       data,
+      pagination: {
+        nextCursor,
+        limit: DEFAULT_PAGE_SIZE,
+        hasNext: nextCursor !== null,
+      },
     };
   }
 

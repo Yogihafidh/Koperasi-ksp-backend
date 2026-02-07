@@ -6,10 +6,12 @@ import {
   Patch,
   Post,
   ParseIntPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiQuery,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -83,6 +85,12 @@ export class PegawaiController {
   @Roles('Admin')
   @Permissions('pegawai.read')
   @ApiOperation({ summary: 'Dapatkan semua pegawai' })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description:
+      'ID terakhir dari halaman sebelumnya (cursor). Kosongkan untuk halaman pertama.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Daftar pegawai berhasil diambil',
@@ -107,13 +115,20 @@ export class PegawaiController {
               },
             },
           ],
+          pagination: {
+            nextCursor: 1,
+            limit: 20,
+            hasNext: false,
+          },
         },
       },
     },
   })
   @ApiAuthErrors()
-  getAllPegawai() {
-    return this.pegawaiService.getAllPegawai();
+  getAllPegawai(
+    @Query('cursor', new ParseIntPipe({ optional: true })) cursor?: number,
+  ) {
+    return this.pegawaiService.getAllPegawai(cursor);
   }
 
   @Get(':id')

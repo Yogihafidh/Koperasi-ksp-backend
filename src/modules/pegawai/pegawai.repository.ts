@@ -52,8 +52,8 @@ export class PegawaiRepository {
     });
   }
 
-  findAllPegawai() {
-    return this.prisma.pegawai.findMany({
+  async findAllPegawai(cursor: number | undefined, take: number) {
+    const data = await this.prisma.pegawai.findMany({
       include: {
         user: {
           select: {
@@ -63,8 +63,23 @@ export class PegawaiRepository {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { id: 'desc' },
+      take: take + 1,
+      ...(cursor
+        ? {
+            cursor: { id: cursor },
+            skip: 1,
+          }
+        : {}),
     });
+
+    let nextCursor: number | null = null;
+    if (data.length > take) {
+      const nextItem = data.pop();
+      nextCursor = nextItem?.id ?? null;
+    }
+
+    return { data, nextCursor };
   }
 
   findPegawaiById(id: number) {
