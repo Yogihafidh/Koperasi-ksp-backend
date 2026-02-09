@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { PegawaiModule } from './modules/pegawai/pegawai.module';
 import { NasabahModule } from './modules/nasabah/nasabah.module';
+import { TransaksiModule } from './modules/transaksi/transaksi.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -18,6 +19,7 @@ import databaseConfig from './config/database.config';
     AuthModule,
     PegawaiModule,
     NasabahModule,
+    TransaksiModule,
   ],
 })
 export class AppModule {}
