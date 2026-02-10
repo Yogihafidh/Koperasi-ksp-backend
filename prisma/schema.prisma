@@ -161,15 +161,16 @@ model Transaksi {
 }
 
 model AuditTrail {
-  id         Int         @id @default(autoincrement())
-  userId     Int
-  entityName String
-  entityId   Int
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     Int?
+  entityName String?
+  entityId   Int?
   action     AuditAction
   oldValue   Json?
   newValue   Json?
+  ipAddress  String?
   createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  user       User        @relation(fields: [userId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
 
   @@index([entityName, entityId])
   @@index([createdAt])
@@ -238,9 +239,13 @@ enum StatusTransaksi {
 }
 
 enum AuditAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
   CREATE
   UPDATE
-  DELETE
+  APPROVE
+  REJECT
 }
 
 enum StatusLaporan {
