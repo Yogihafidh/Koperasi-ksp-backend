@@ -6,6 +6,7 @@ import { NasabahModule } from './modules/nasabah/nasabah.module';
 import { TransaksiModule } from './modules/transaksi/transaksi.module';
 import { SimpananModule } from './modules/simpanan/simpanan.module';
 import { PinjamanModule } from './modules/pinjaman/pinjaman.module';
+import { AuditModule } from './modules/audit/audit.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -24,6 +25,7 @@ import databaseConfig from './config/database.config';
     TransaksiModule,
     SimpananModule,
     PinjamanModule,
+    AuditModule,
   ],
 })
 export class AppModule {}
