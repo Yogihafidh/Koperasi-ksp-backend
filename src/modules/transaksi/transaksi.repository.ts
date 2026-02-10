@@ -11,6 +11,23 @@ import {
 export class TransaksiRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  private readonly transaksiSummarySelect: Prisma.TransaksiSelect = {
+    id: true,
+    nasabahId: true,
+    pegawaiId: true,
+    rekeningSimpananId: true,
+    pinjamanId: true,
+    jenisTransaksi: true,
+    nominal: true,
+    tanggal: true,
+    metodePembayaran: true,
+    statusTransaksi: true,
+    urlBuktiTransaksi: true,
+    catatan: true,
+    createdAt: true,
+    deletedAt: true,
+  };
+
   findPegawaiByUserId(userId: number) {
     return this.prisma.pegawai.findUnique({
       where: { userId },
@@ -61,12 +78,7 @@ export class TransaksiRepository {
   }) {
     return this.prisma.transaksi.create({
       data,
-      include: {
-        nasabah: true,
-        pegawai: true,
-        rekeningSimpanan: true,
-        pinjaman: true,
-      },
+      select: this.transaksiSummarySelect,
     });
   }
 
@@ -82,6 +94,13 @@ export class TransaksiRepository {
     });
   }
 
+  findTransaksiSummaryById(id: number) {
+    return this.prisma.transaksi.findFirst({
+      where: { id, deletedAt: null },
+      select: this.transaksiSummarySelect,
+    });
+  }
+
   private async findTransaksiList(args: {
     cursor?: number;
     take: number;
@@ -89,12 +108,7 @@ export class TransaksiRepository {
   }) {
     const data = await this.prisma.transaksi.findMany({
       where: { deletedAt: null, ...args.where },
-      include: {
-        nasabah: true,
-        pegawai: true,
-        rekeningSimpanan: true,
-        pinjaman: true,
-      },
+      select: this.transaksiSummarySelect,
       orderBy: { id: 'desc' },
       take: args.take + 1,
       ...(args.cursor
@@ -221,12 +235,7 @@ export class TransaksiRepository {
 
     return this.prisma.transaksi.findMany({
       where: { deletedAt: null, ...where },
-      include: {
-        nasabah: true,
-        pegawai: true,
-        rekeningSimpanan: true,
-        pinjaman: true,
-      },
+      select: this.transaksiSummarySelect,
       orderBy: { id: 'desc' },
     });
   }
@@ -271,12 +280,7 @@ export class TransaksiRepository {
           statusTransaksi: args.statusTransaksi,
           catatan: args.catatan ?? undefined,
         },
-        include: {
-          nasabah: true,
-          pegawai: true,
-          rekeningSimpanan: true,
-          pinjaman: true,
-        },
+        select: this.transaksiSummarySelect,
       });
     });
   }

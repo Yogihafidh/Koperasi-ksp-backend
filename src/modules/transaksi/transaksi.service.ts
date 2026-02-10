@@ -94,8 +94,17 @@ export class TransaksiService {
       }
 
       const nominal = this.toDecimal(dto.nominal);
-      if (pinjaman.sisaPinjaman.lessThan(nominal)) {
-        throw new BadRequestException('Nominal melebihi sisa pinjaman');
+      if (dto.jenisTransaksi === JenisTransaksi.PENCAIRAN) {
+        if (pinjaman.sisaPinjaman.greaterThan(this.toDecimal(0))) {
+          throw new BadRequestException('Pencairan pinjaman sudah dibuat');
+        }
+        if (!nominal.equals(pinjaman.jumlahPinjaman)) {
+          throw new BadRequestException('Pencairan anda tidak sesuai');
+        }
+      } else {
+        if (pinjaman.sisaPinjaman.lessThan(nominal)) {
+          throw new BadRequestException('Nominal melebihi sisa pinjaman');
+        }
       }
     }
 
@@ -115,10 +124,7 @@ export class TransaksiService {
       catatan: dto.catatan,
     });
 
-    return {
-      message: 'Transaksi berhasil dicatat dan menunggu proses',
-      data: transaksi,
-    };
+    return this.processTransaksi(transaksi.id);
   }
 
   async processTransaksi(id: number) {
@@ -199,9 +205,14 @@ export class TransaksiService {
         let statusPinjaman: PinjamanStatus | undefined;
 
         if (transaksi.jenisTransaksi === JenisTransaksi.PENCAIRAN) {
-          if (sisaPinjaman.lessThanOrEqualTo(this.toDecimal(0))) {
-            sisaBaru = nominal;
+          const jumlahPinjaman = transaksi.pinjaman.jumlahPinjaman;
+          if (sisaPinjaman.greaterThan(this.toDecimal(0))) {
+            throw new BadRequestException('Pencairan pinjaman sudah dibuat');
           }
+          if (!nominal.equals(jumlahPinjaman)) {
+            throw new BadRequestException('Pencairan anda tidak sesuai');
+          }
+          sisaBaru = jumlahPinjaman;
         } else {
           if (sisaPinjaman.lessThan(nominal)) {
             throw new BadRequestException('Nominal melebihi sisa pinjaman');
@@ -247,7 +258,8 @@ export class TransaksiService {
   }
 
   async getTransaksiById(id: number) {
-    const transaksi = await this.transaksiRepository.findTransaksiById(id);
+    const transaksi =
+      await this.transaksiRepository.findTransaksiSummaryById(id);
     if (!transaksi) {
       throw new NotFoundException('Transaksi tidak ditemukan');
     }

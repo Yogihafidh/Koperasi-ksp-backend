@@ -43,9 +43,9 @@ export class TransaksiController {
   @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('transaksi.create')
   @ApiOperation({
-    summary: 'Buat transaksi baru (PENDING)',
+    summary: 'Buat transaksi baru (AUTO PROCESS)',
     description:
-      'Mencatat transaksi setelah validasi bisnis. Status awal selalu PENDING dan tidak mengubah saldo.',
+      'Mencatat transaksi setelah validasi bisnis lalu langsung diproses hingga APPROVED/REJECTED.',
   })
   @ApiBody({
     description:
@@ -58,14 +58,14 @@ export class TransaksiController {
     content: {
       'application/json': {
         example: {
-          message: 'Transaksi berhasil dicatat dan menunggu proses',
+          message: 'Transaksi berhasil diproses',
           data: {
             id: 1,
             nasabahId: 1,
             pegawaiId: 2,
             rekeningSimpananId: 10,
             jenisTransaksi: 'SETORAN',
-            statusTransaksi: 'PENDING',
+            statusTransaksi: 'APPROVED',
             nominal: 150000,
             metodePembayaran: 'TRANSFER',
             tanggal: '2026-02-09T10:00:00.000Z',
