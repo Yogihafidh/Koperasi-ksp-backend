@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PegawaiRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
 
   findUserById(userId: number) {
     return this.prisma.user.findUnique({
@@ -31,14 +35,18 @@ export class PegawaiRepository {
     });
   }
 
-  createPegawai(data: {
-    userId: number;
-    nama: string;
-    jabatan: string;
-    noHp: string;
-    alamat: string;
-  }) {
-    return this.prisma.pegawai.create({
+  createPegawai(
+    data: {
+      userId: number;
+      nama: string;
+      jabatan: string;
+      noHp: string;
+      alamat: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.pegawai.create({
       data,
       include: {
         user: {
@@ -105,8 +113,10 @@ export class PegawaiRepository {
       noHp?: string;
       alamat?: string;
     },
+    tx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.pegawai.update({
+    const client = this.getClient(tx);
+    return client.pegawai.update({
       where: { id },
       data,
       include: {
@@ -121,8 +131,13 @@ export class PegawaiRepository {
     });
   }
 
-  updatePegawaiStatus(id: number, statusAktif: boolean) {
-    return this.prisma.pegawai.update({
+  updatePegawaiStatus(
+    id: number,
+    statusAktif: boolean,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.pegawai.update({
       where: { id },
       data: { statusAktif },
       include: {

@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -22,7 +23,7 @@ import {
   UpdatePegawaiDto,
   TogglePegawaiStatusDto,
 } from './dto';
-import { Roles, Permissions } from '../../common/decorators';
+import { CurrentUser, Roles, Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
   RolesGuard,
@@ -34,6 +35,8 @@ import {
   ApiConflictExample,
   ApiNotFoundExample,
 } from '../../common/decorators/api-docs.decorator';
+import type { Request } from 'express';
+import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('pegawai')
 @Controller('pegawai')
@@ -76,8 +79,12 @@ export class PegawaiController {
   @ApiConflictExample('User sudah terdaftar sebagai pegawai')
   @ApiNotFoundExample('User tidak ditemukan')
   @ApiAuthErrors()
-  createPegawai(@Body() dto: CreatePegawaiDto) {
-    return this.pegawaiService.createPegawai(dto);
+  createPegawai(
+    @Body() dto: CreatePegawaiDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
+  ) {
+    return this.pegawaiService.createPegawai(dto, user.userId, request.ip);
   }
 
   @Get()
@@ -205,8 +212,10 @@ export class PegawaiController {
   updatePegawai(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePegawaiDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.pegawaiService.updatePegawai(id, dto);
+    return this.pegawaiService.updatePegawai(id, dto, user.userId, request.ip);
   }
 
   @Patch(':id/status')
@@ -246,7 +255,14 @@ export class PegawaiController {
   updatePegawaiStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: TogglePegawaiStatusDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.pegawaiService.updatePegawaiStatus(id, dto);
+    return this.pegawaiService.updatePegawaiStatus(
+      id,
+      dto,
+      user.userId,
+      request.ip,
+    );
   }
 }
