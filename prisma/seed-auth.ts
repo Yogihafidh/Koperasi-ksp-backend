@@ -41,22 +41,21 @@ async function seed() {
       { code: 'pegawai.delete', description: 'Delete pegawai' },
 
       // Simpanan permissions
-      { code: 'simpanan.create', description: 'Create simpanan' },
       { code: 'simpanan.read', description: 'Read simpanan' },
-      { code: 'simpanan.update', description: 'Update simpanan' },
-      { code: 'simpanan.delete', description: 'Delete simpanan' },
+      { code: 'simpanan.setor', description: 'Setor simpanan' },
+      { code: 'simpanan.tarik', description: 'Tarik simpanan' },
 
       // Pinjaman permissions
-      { code: 'pinjaman.create', description: 'Create pinjaman' },
+      { code: 'pinjaman.ajukan', description: 'Ajukan pinjaman' },
       { code: 'pinjaman.read', description: 'Read pinjaman' },
-      { code: 'pinjaman.update', description: 'Update pinjaman' },
-      { code: 'pinjaman.delete', description: 'Delete pinjaman' },
-      { code: 'pinjaman.approve', description: 'Approve pinjaman' },
-      { code: 'pinjaman.reject', description: 'Reject pinjaman' },
+      { code: 'pinjaman.verify', description: 'Verifikasi pinjaman' },
+      { code: 'pinjaman.cairkan', description: 'Pencairan pinjaman' },
+      { code: 'pinjaman.angsuran', description: 'Bayar angsuran pinjaman' },
 
       // Transaksi permissions
       { code: 'transaksi.create', description: 'Create transaksi' },
       { code: 'transaksi.read', description: 'Read transaksi' },
+      { code: 'transaksi.process', description: 'Process transaksi' },
 
       // Laporan permissions
       { code: 'laporan.read', description: 'Read laporan' },
@@ -131,9 +130,12 @@ async function seed() {
     console.log('3.2 Assigning permissions to Kasir role...');
     const kasirPermissionCodes = [
       'nasabah.read',
-      'simpanan.create',
       'simpanan.read',
+      'simpanan.setor',
+      'simpanan.tarik',
       'pinjaman.read',
+      'pinjaman.cairkan',
+      'pinjaman.angsuran',
       'transaksi.create',
       'transaksi.read',
     ];
@@ -159,9 +161,8 @@ async function seed() {
       'nasabah.update',
       'pegawai.read',
       'simpanan.read',
-      'pinjaman.create',
+      'pinjaman.ajukan',
       'pinjaman.read',
-      'pinjaman.update',
       'transaksi.read',
     ];
     const staffPermissions = await prisma.permission.findMany({
@@ -185,9 +186,9 @@ async function seed() {
       'pegawai.read',
       'simpanan.read',
       'pinjaman.read',
-      'pinjaman.approve',
-      'pinjaman.reject',
+      'pinjaman.verify',
       'transaksi.read',
+      'transaksi.process',
       'laporan.read',
       'laporan.generate',
       'laporan.finalize',

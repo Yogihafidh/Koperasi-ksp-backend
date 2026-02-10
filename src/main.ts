@@ -46,6 +46,8 @@ async function bootstrap() {
     .addTag('pegawai', 'Pegawai Management')
     .addTag('nasabah', 'Nasabah Management')
     .addTag('transaksi', 'Transaksi Management')
+    .addTag('simpanan', 'Simpanan Management')
+    .addTag('pinjaman', 'Pinjaman Management')
     .addBearerAuth(
       {
         type: 'http',

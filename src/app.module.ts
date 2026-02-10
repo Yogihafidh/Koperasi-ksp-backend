@@ -4,6 +4,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PegawaiModule } from './modules/pegawai/pegawai.module';
 import { NasabahModule } from './modules/nasabah/nasabah.module';
 import { TransaksiModule } from './modules/transaksi/transaksi.module';
+import { SimpananModule } from './modules/simpanan/simpanan.module';
+import { PinjamanModule } from './modules/pinjaman/pinjaman.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -20,6 +22,8 @@ import databaseConfig from './config/database.config';
     PegawaiModule,
     NasabahModule,
     TransaksiModule,
+    SimpananModule,
+    PinjamanModule,
   ],
 })
 export class AppModule {}
