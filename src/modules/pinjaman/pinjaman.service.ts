@@ -4,10 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuditAction,
   JenisTransaksi,
   NasabahStatus,
   PinjamanStatus,
   Prisma,
+  PrismaClient,
   StatusTransaksi,
 } from '@prisma/client';
 import { PinjamanRepository } from './pinjaman.repository';
@@ -20,6 +22,7 @@ import {
 import { TransaksiRepository } from '../transaksi/transaksi.repository';
 import { TransaksiService } from '../transaksi/transaksi.service';
 import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
+import { AuditTrailService } from '../audit/audit.service';
 
 @Injectable()
 export class PinjamanService {
@@ -27,13 +30,19 @@ export class PinjamanService {
     private readonly pinjamanRepository: PinjamanRepository,
     private readonly transaksiRepository: TransaksiRepository,
     private readonly transaksiService: TransaksiService,
+    private readonly auditTrailService: AuditTrailService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   private toDecimal(value: number | Prisma.Decimal) {
     return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
   }
 
-  async createPinjaman(dto: CreatePinjamanDto) {
+  async createPinjaman(
+    dto: CreatePinjamanDto,
+    userId: number,
+    ipAddress?: string,
+  ) {
     const nasabah = await this.pinjamanRepository.findNasabahById(
       dto.nasabahId,
     );
@@ -45,13 +54,38 @@ export class PinjamanService {
       throw new BadRequestException('Nasabah tidak aktif');
     }
 
-    const pinjaman = await this.pinjamanRepository.createPinjaman({
-      nasabahId: dto.nasabahId,
-      jumlahPinjaman: dto.jumlahPinjaman,
-      bungaPersen: dto.bungaPersen,
-      tenorBulan: dto.tenorBulan,
-      sisaPinjaman: 0,
-      status: PinjamanStatus.PENDING,
+    const pinjaman = await this.prisma.$transaction(async (tx) => {
+      const created = await this.pinjamanRepository.createPinjaman(
+        {
+          nasabahId: dto.nasabahId,
+          jumlahPinjaman: dto.jumlahPinjaman,
+          bungaPersen: dto.bungaPersen,
+          tenorBulan: dto.tenorBulan,
+          sisaPinjaman: 0,
+          status: PinjamanStatus.PENDING,
+        },
+        tx,
+      );
+
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.CREATE,
+          entityName: 'Pinjaman',
+          entityId: created.id,
+          userId,
+          after: {
+            nasabahId: created.nasabahId,
+            jumlahPinjaman: created.jumlahPinjaman,
+            bungaPersen: created.bungaPersen,
+            tenorBulan: created.tenorBulan,
+            status: created.status,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return created;
     });
 
     return {
@@ -95,6 +129,7 @@ export class PinjamanService {
     id: number,
     dto: VerifikasiPinjamanDto,
     userId: number,
+    ipAddress?: string,
   ) {
     const pinjaman = await this.pinjamanRepository.findPinjamanById(id);
     if (!pinjaman) {
@@ -121,11 +156,45 @@ export class PinjamanService {
       throw new BadRequestException('Pegawai tidak aktif');
     }
 
-    const updated = await this.pinjamanRepository.updatePinjamanStatus({
-      id,
-      status: dto.status,
-      verifiedById: pegawai.id,
-      tanggalPersetujuan: new Date(),
+    const auditAction =
+      dto.status === PinjamanStatus.DISETUJUI
+        ? AuditAction.APPROVE
+        : AuditAction.REJECT;
+    const approvedAt = new Date();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.pinjamanRepository.updatePinjamanStatus(
+        {
+          id,
+          status: dto.status,
+          verifiedById: pegawai.id,
+          tanggalPersetujuan: approvedAt,
+        },
+        tx,
+      );
+
+      await this.auditTrailService.log(
+        {
+          action: auditAction,
+          entityName: 'Pinjaman',
+          entityId: id,
+          userId,
+          before: {
+            status: pinjaman.status,
+            verifiedById: pinjaman.verifiedById ?? null,
+            tanggalPersetujuan: pinjaman.tanggalPersetujuan ?? null,
+          },
+          after: {
+            status: result.status,
+            verifiedById: result.verifiedById ?? null,
+            tanggalPersetujuan: result.tanggalPersetujuan ?? null,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return result;
     });
 
     return {

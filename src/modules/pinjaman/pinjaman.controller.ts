@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -36,6 +37,7 @@ import {
   ApiNotFoundExample,
 } from '../../common/decorators/api-docs.decorator';
 import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
+import type { Request } from 'express';
 
 @ApiTags('pinjaman')
 @Controller('pinjaman')
@@ -56,8 +58,12 @@ export class PinjamanController {
   @ApiBadRequestExample('Nasabah tidak aktif')
   @ApiNotFoundExample('Nasabah tidak ditemukan')
   @ApiAuthErrors()
-  createPinjaman(@Body() dto: CreatePinjamanDto) {
-    return this.pinjamanService.createPinjaman(dto);
+  createPinjaman(
+    @Body() dto: CreatePinjamanDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
+  ) {
+    return this.pinjamanService.createPinjaman(dto, user.userId, request.ip);
   }
 
   @Get(':id')
@@ -115,8 +121,14 @@ export class PinjamanController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: VerifikasiPinjamanDto,
     @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.pinjamanService.verifikasiPinjaman(id, dto, user.userId);
+    return this.pinjamanService.verifikasiPinjaman(
+      id,
+      dto,
+      user.userId,
+      request.ip,
+    );
   }
 
   @Post(':id/pencairan')

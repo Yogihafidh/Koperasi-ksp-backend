@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   JenisTransaksi,
   PinjamanStatus,
+  Prisma,
   PrismaClient,
   StatusTransaksi,
 } from '@prisma/client';
@@ -9,6 +10,10 @@ import {
 @Injectable()
 export class PinjamanRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
 
   findPegawaiByUserId(userId: number) {
     return this.prisma.pegawai.findUnique({
@@ -30,15 +35,19 @@ export class PinjamanRepository {
     });
   }
 
-  createPinjaman(data: {
-    nasabahId: number;
-    jumlahPinjaman: number;
-    bungaPersen: number;
-    tenorBulan: number;
-    sisaPinjaman: number;
-    status: PinjamanStatus;
-  }) {
-    return this.prisma.pinjaman.create({
+  createPinjaman(
+    data: {
+      nasabahId: number;
+      jumlahPinjaman: number;
+      bungaPersen: number;
+      tenorBulan: number;
+      sisaPinjaman: number;
+      status: PinjamanStatus;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.pinjaman.create({
       data,
       include: {
         nasabah: true,
@@ -87,13 +96,17 @@ export class PinjamanRepository {
     return { data, nextCursor };
   }
 
-  updatePinjamanStatus(args: {
-    id: number;
-    status: PinjamanStatus;
-    verifiedById?: number;
-    tanggalPersetujuan?: Date | null;
-  }) {
-    return this.prisma.pinjaman.update({
+  updatePinjamanStatus(
+    args: {
+      id: number;
+      status: PinjamanStatus;
+      verifiedById?: number;
+      tanggalPersetujuan?: Date | null;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.pinjaman.update({
       where: { id: args.id },
       data: {
         status: args.status,
