@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { JenisDokumen, NasabahStatus } from '@prisma/client';
+import { JenisDokumen, JenisSimpanan, NasabahStatus } from '@prisma/client';
 import { NasabahRepository } from './nasabah.repository';
 import {
   CreateNasabahDto,
@@ -269,6 +269,10 @@ export class NasabahService {
       dto.catatan,
     );
 
+    if (dto.status === NasabahStatus.AKTIF) {
+      await this.ensureRekeningSimpanan(id);
+    }
+
     return {
       message: 'Verifikasi nasabah berhasil',
       data: updated,
@@ -294,9 +298,36 @@ export class NasabahService {
       nasabah.catatan ?? undefined,
     );
 
+    if (dto.status === NasabahStatus.AKTIF) {
+      await this.ensureRekeningSimpanan(id);
+    }
+
     return {
       message: 'Status nasabah berhasil diperbarui',
       data: updated,
     };
+  }
+
+  private async ensureRekeningSimpanan(nasabahId: number) {
+    const jenisList = [
+      JenisSimpanan.POKOK,
+      JenisSimpanan.WAJIB,
+      JenisSimpanan.SUKARELA,
+    ];
+
+    for (const jenis of jenisList) {
+      const existing =
+        await this.nasabahRepository.findRekeningSimpananByNasabahAndJenis(
+          nasabahId,
+          jenis,
+        );
+      if (!existing) {
+        await this.nasabahRepository.createRekeningSimpanan({
+          nasabahId,
+          jenisSimpanan: jenis,
+          saldoBerjalan: 0,
+        });
+      }
+    }
   }
 }

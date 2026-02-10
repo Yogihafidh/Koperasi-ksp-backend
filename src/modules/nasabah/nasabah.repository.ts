@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient, NasabahStatus, JenisDokumen } from '@prisma/client';
+import {
+  PrismaClient,
+  NasabahStatus,
+  JenisDokumen,
+  JenisSimpanan,
+} from '@prisma/client';
 
 @Injectable()
 export class NasabahRepository {
@@ -165,6 +170,25 @@ export class NasabahRepository {
         },
         dokumen: true,
       },
+    });
+  }
+
+  findRekeningSimpananByNasabahAndJenis(
+    nasabahId: number,
+    jenisSimpanan: JenisSimpanan,
+  ) {
+    return this.prisma.rekeningSimpanan.findFirst({
+      where: { nasabahId, jenisSimpanan, deletedAt: null },
+    });
+  }
+
+  createRekeningSimpanan(data: {
+    nasabahId: number;
+    jenisSimpanan: JenisSimpanan;
+    saldoBerjalan: number;
+  }) {
+    return this.prisma.rekeningSimpanan.create({
+      data,
     });
   }
 
