@@ -34,6 +34,14 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix') || 'api';
   app.setGlobalPrefix(apiPrefix);
 
+  const trustProxy = configService.get<boolean>('app.trustProxy');
+  if (trustProxy) {
+    const instance = app.getHttpAdapter().getInstance() as {
+      set?: (key: string, value: unknown) => void;
+    };
+    instance.set?.('trust proxy', true);
+  }
+
   // Setup Swagger/OpenAPI Documentation
   const config = new DocumentBuilder()
     .setTitle('Koperasi API')
