@@ -8,6 +8,7 @@ import {
   Delete,
   ParseIntPipe,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -29,6 +30,7 @@ import {
   RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
+import type { Request } from 'express';
 
 @ApiTags('roles')
 @Controller('roles')
@@ -61,8 +63,8 @@ export class RolesController {
   @ApiBadRequestExample('Data tidak valid')
   @ApiAuthErrors()
   @ApiConflictExample('Role sudah ada')
-  createRole(@Body() createRoleDto: CreateRoleDto) {
-    return this.authService.createRole(createRoleDto);
+  createRole(@Body() createRoleDto: CreateRoleDto, @Req() request: Request) {
+    return this.authService.createRole(createRoleDto, request.ip);
   }
 
   @Get()
@@ -152,8 +154,9 @@ export class RolesController {
   updateRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateRoleDto: UpdateRoleDto,
+    @Req() request: Request,
   ) {
-    return this.authService.updateRole(id, updateRoleDto);
+    return this.authService.updateRole(id, updateRoleDto, request.ip);
   }
 
   @Delete(':id')
@@ -201,8 +204,13 @@ export class RolesController {
   assignPermissionsToRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() assignPermissionsDto: AssignPermissionsDto,
+    @Req() request: Request,
   ) {
-    return this.authService.assignPermissionsToRole(id, assignPermissionsDto);
+    return this.authService.assignPermissionsToRole(
+      id,
+      assignPermissionsDto,
+      request.ip,
+    );
   }
 
   @Delete(':roleId/permissions/:permissionId')
@@ -226,7 +234,12 @@ export class RolesController {
   removePermissionFromRole(
     @Param('roleId', ParseIntPipe) roleId: number,
     @Param('permissionId', ParseIntPipe) permissionId: number,
+    @Req() request: Request,
   ) {
-    return this.authService.removePermissionFromRole(roleId, permissionId);
+    return this.authService.removePermissionFromRole(
+      roleId,
+      permissionId,
+      request.ip,
+    );
   }
 }

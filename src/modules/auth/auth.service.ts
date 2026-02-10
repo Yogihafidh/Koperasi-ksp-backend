@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { AuditAction, PrismaClient } from '@prisma/client';
 import { AuthRepository } from './auth.repository';
 import {
   RegisterDto,
@@ -21,6 +22,7 @@ import {
   AssignRolesDto,
   UpdateUserDto,
 } from './dto';
+import { AuditTrailService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +32,8 @@ export class AuthService {
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditTrailService: AuditTrailService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   // ==================== AUTHENTICATION ====================
@@ -70,18 +74,32 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, ipAddress?: string) {
     // Find user by username or email
     const user = await this.authRepository.findUserByUsernameOrEmail(
       loginDto.usernameOrEmail,
     );
 
     if (!user) {
+      await this.auditTrailService.log({
+        action: AuditAction.LOGIN_FAILED,
+        entityName: 'Auth',
+        after: { identifier: loginDto.usernameOrEmail },
+        ipAddress,
+      });
       throw new UnauthorizedException('Username/email atau password salah');
     }
 
     // Check if user is active
     if (!user.isActive) {
+      await this.auditTrailService.log({
+        action: AuditAction.LOGIN_FAILED,
+        entityName: 'User',
+        entityId: user.id,
+        userId: user.id,
+        after: { reason: 'INACTIVE' },
+        ipAddress,
+      });
       throw new UnauthorizedException('Akun Anda tidak aktif');
     }
 
@@ -92,11 +110,34 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      await this.auditTrailService.log({
+        action: AuditAction.LOGIN_FAILED,
+        entityName: 'User',
+        entityId: user.id,
+        userId: user.id,
+        after: { reason: 'INVALID_CREDENTIALS' },
+        ipAddress,
+      });
       throw new UnauthorizedException('Username/email atau password salah');
     }
 
     // Update last login
-    await this.authRepository.updateLastLogin(user.id);
+    const loginAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await this.authRepository.updateLastLogin(user.id, loginAt, tx);
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.LOGIN,
+          entityName: 'User',
+          entityId: user.id,
+          userId: user.id,
+          before: { lastLoginAt: user.lastLoginAt?.toISOString() ?? null },
+          after: { lastLoginAt: loginAt.toISOString() },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     // Extract roles and permissions
     const roles = user.roles.map((ur) => ur.role.name);
@@ -309,24 +350,26 @@ export class AuthService {
     };
   }
 
-  logout(accessToken: string) {
+  logout(accessToken: string, ipAddress?: string) {
     if (!accessToken) {
       throw new UnauthorizedException(
         'Token tidak valid atau sudah kedaluwarsa',
       );
     }
 
-    const decoded = this.jwtService.decode(accessToken) as {
-      exp?: number;
-    } | null;
+    const decoded = this.jwtService.decode(accessToken);
+    const tokenPayload =
+      decoded && typeof decoded === 'object'
+        ? (decoded as { sub?: number; exp?: number })
+        : null;
 
-    if (!decoded?.exp) {
+    if (!tokenPayload?.exp) {
       throw new UnauthorizedException(
         'Token tidak valid atau sudah kedaluwarsa',
       );
     }
 
-    const expiresAtMs = decoded.exp * 1000;
+    const expiresAtMs = tokenPayload.exp * 1000;
     if (expiresAtMs <= Date.now()) {
       throw new UnauthorizedException(
         'Token tidak valid atau sudah kedaluwarsa',
@@ -334,6 +377,16 @@ export class AuthService {
     }
 
     this.tokenBlacklist.set(accessToken, expiresAtMs);
+
+    if (tokenPayload?.sub) {
+      void this.auditTrailService.log({
+        action: AuditAction.LOGOUT,
+        entityName: 'User',
+        entityId: tokenPayload.sub,
+        userId: tokenPayload.sub,
+        ipAddress,
+      });
+    }
 
     return {
       message: 'Logout berhasil',
@@ -355,7 +408,7 @@ export class AuthService {
   }
 
   // ==================== ROLE MANAGEMENT ====================
-  async createRole(createRoleDto: CreateRoleDto) {
+  async createRole(createRoleDto: CreateRoleDto, ipAddress?: string) {
     // Check if role already exists
     const existingRole = await this.authRepository.findRoleByName(
       createRoleDto.name,
@@ -365,7 +418,23 @@ export class AuthService {
       throw new ConflictException('Role sudah ada');
     }
 
-    const role = await this.authRepository.createRole(createRoleDto);
+    const role = await this.prisma.$transaction(async (tx) => {
+      const created = await this.authRepository.createRole(createRoleDto, tx);
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.CREATE,
+          entityName: 'Role',
+          entityId: created.id,
+          after: {
+            name: created.name,
+            description: created.description ?? null,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+      return created;
+    });
 
     return {
       message: 'Role berhasil dibuat',
@@ -395,7 +464,11 @@ export class AuthService {
     };
   }
 
-  async updateRole(id: number, updateRoleDto: UpdateRoleDto) {
+  async updateRole(
+    id: number,
+    updateRoleDto: UpdateRoleDto,
+    ipAddress?: string,
+  ) {
     const role = await this.authRepository.findRoleById(id);
 
     if (!role) {
@@ -413,7 +486,31 @@ export class AuthService {
       }
     }
 
-    const updatedRole = await this.authRepository.updateRole(id, updateRoleDto);
+    const updatedRole = await this.prisma.$transaction(async (tx) => {
+      const updated = await this.authRepository.updateRole(
+        id,
+        updateRoleDto,
+        tx,
+      );
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Role',
+          entityId: updated.id,
+          before: {
+            name: role.name,
+            description: role.description ?? null,
+          },
+          after: {
+            name: updated.name,
+            description: updated.description ?? null,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+      return updated;
+    });
 
     return {
       message: 'Role berhasil diperbarui',
@@ -436,7 +533,10 @@ export class AuthService {
   }
 
   // ==================== PERMISSION MANAGEMENT ====================
-  async createPermission(createPermissionDto: CreatePermissionDto) {
+  async createPermission(
+    createPermissionDto: CreatePermissionDto,
+    ipAddress?: string,
+  ) {
     // Check if permission already exists
     const existingPermission = await this.authRepository.findPermissionByCode(
       createPermissionDto.code,
@@ -446,8 +546,26 @@ export class AuthService {
       throw new ConflictException('Permission sudah ada');
     }
 
-    const permission =
-      await this.authRepository.createPermission(createPermissionDto);
+    const permission = await this.prisma.$transaction(async (tx) => {
+      const created = await this.authRepository.createPermission(
+        createPermissionDto,
+        tx,
+      );
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.CREATE,
+          entityName: 'Permission',
+          entityId: created.id,
+          after: {
+            code: created.code,
+            description: created.description ?? null,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+      return created;
+    });
 
     return {
       message: 'Permission berhasil dibuat',
@@ -482,6 +600,7 @@ export class AuthService {
   async assignPermissionsToRole(
     roleId: number,
     assignPermissionsDto: AssignPermissionsDto,
+    ipAddress?: string,
   ) {
     const role = await this.authRepository.findRoleById(roleId);
 
@@ -501,17 +620,36 @@ export class AuthService {
       }
     }
 
-    await this.authRepository.assignPermissionsToRole(
-      roleId,
-      assignPermissionsDto.permissionIds,
-    );
+    const beforeIds = role.permissions.map((rp) => rp.permissionId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.authRepository.assignPermissionsToRole(
+        roleId,
+        assignPermissionsDto.permissionIds,
+        tx,
+      );
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Role',
+          entityId: roleId,
+          before: { permissionIds: beforeIds },
+          after: { permissionIds: assignPermissionsDto.permissionIds },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     return {
       message: 'Permission berhasil di-assign ke role',
     };
   }
 
-  async removePermissionFromRole(roleId: number, permissionId: number) {
+  async removePermissionFromRole(
+    roleId: number,
+    permissionId: number,
+    ipAddress?: string,
+  ) {
     const role = await this.authRepository.findRoleById(roleId);
 
     if (!role) {
@@ -525,7 +663,26 @@ export class AuthService {
       throw new NotFoundException('Permission tidak ditemukan');
     }
 
-    await this.authRepository.removePermissionFromRole(roleId, permissionId);
+    const beforeIds = role.permissions.map((rp) => rp.permissionId);
+    const afterIds = beforeIds.filter((id) => id !== permissionId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.authRepository.removePermissionFromRole(
+        roleId,
+        permissionId,
+        tx,
+      );
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Role',
+          entityId: roleId,
+          before: { permissionIds: beforeIds },
+          after: { permissionIds: afterIds },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     return {
       message: 'Permission berhasil dihapus dari role',
@@ -533,7 +690,11 @@ export class AuthService {
   }
 
   // ==================== USER-ROLE ASSIGNMENT ====================
-  async assignRolesToUser(userId: number, assignRolesDto: AssignRolesDto) {
+  async assignRolesToUser(
+    userId: number,
+    assignRolesDto: AssignRolesDto,
+    ipAddress?: string,
+  ) {
     const user = await this.authRepository.findUserById(userId);
 
     if (!user) {
@@ -549,14 +710,34 @@ export class AuthService {
       }
     }
 
-    await this.authRepository.assignRolesToUser(userId, assignRolesDto.roleIds);
+    const beforeRoles = await this.authRepository.getUserRoles(userId);
+    const beforeIds = beforeRoles.map((ur) => ur.roleId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.authRepository.assignRolesToUser(
+        userId,
+        assignRolesDto.roleIds,
+        tx,
+      );
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'User',
+          entityId: userId,
+          userId,
+          before: { roleIds: beforeIds },
+          after: { roleIds: assignRolesDto.roleIds },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     return {
       message: 'Role berhasil di-assign ke user',
     };
   }
 
-  async removeRoleFromUser(userId: number, roleId: number) {
+  async removeRoleFromUser(userId: number, roleId: number, ipAddress?: string) {
     const user = await this.authRepository.findUserById(userId);
 
     if (!user) {
@@ -569,7 +750,24 @@ export class AuthService {
       throw new NotFoundException('Role tidak ditemukan');
     }
 
-    await this.authRepository.removeRoleFromUser(userId, roleId);
+    const beforeRoles = await this.authRepository.getUserRoles(userId);
+    const beforeIds = beforeRoles.map((ur) => ur.roleId);
+    const afterIds = beforeIds.filter((id) => id !== roleId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.authRepository.removeRoleFromUser(userId, roleId, tx);
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'User',
+          entityId: userId,
+          userId,
+          before: { roleIds: beforeIds },
+          after: { roleIds: afterIds },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     return {
       message: 'Role berhasil dihapus dari user',

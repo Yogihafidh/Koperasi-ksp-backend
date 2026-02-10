@@ -7,6 +7,7 @@ import {
   Delete,
   ParseIntPipe,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,6 +29,7 @@ import {
   RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
+import type { Request } from 'express';
 
 @ApiTags('permissions')
 @Controller('permissions')
@@ -60,8 +62,11 @@ export class PermissionsController {
   @ApiBadRequestExample('Data tidak valid')
   @ApiAuthErrors()
   @ApiConflictExample('Permission sudah ada')
-  createPermission(@Body() createPermissionDto: CreatePermissionDto) {
-    return this.authService.createPermission(createPermissionDto);
+  createPermission(
+    @Body() createPermissionDto: CreatePermissionDto,
+    @Req() request: Request,
+  ) {
+    return this.authService.createPermission(createPermissionDto, request.ip);
   }
 
   @Get()

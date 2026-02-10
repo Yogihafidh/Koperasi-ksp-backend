@@ -8,6 +8,7 @@ import {
   Delete,
   ParseIntPipe,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,6 +29,7 @@ import {
   RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
+import type { Request } from 'express';
 
 @ApiTags('users')
 @Controller('users')
@@ -91,8 +93,9 @@ export class UsersController {
   assignRolesToUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() assignRolesDto: AssignRolesDto,
+    @Req() request: Request,
   ) {
-    return this.authService.assignRolesToUser(id, assignRolesDto);
+    return this.authService.assignRolesToUser(id, assignRolesDto, request.ip);
   }
 
   @Delete(':userId/roles/:roleId')
@@ -116,8 +119,9 @@ export class UsersController {
   removeRoleFromUser(
     @Param('userId', ParseIntPipe) userId: number,
     @Param('roleId', ParseIntPipe) roleId: number,
+    @Req() request: Request,
   ) {
-    return this.authService.removeRoleFromUser(userId, roleId);
+    return this.authService.removeRoleFromUser(userId, roleId, request.ip);
   }
 
   @Get(':id/roles')

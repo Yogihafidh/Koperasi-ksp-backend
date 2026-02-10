@@ -83,8 +83,8 @@ export class AuthController {
   })
   @ApiUnauthorizedExample('Username/email atau password salah')
   @ApiForbiddenExample('Akun tidak aktif')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  login(@Body() loginDto: LoginDto, @Req() request: Request) {
+    return this.authService.login(loginDto, request.ip);
   }
 
   // Get Profile of Logged-in User
@@ -179,6 +179,6 @@ export class AuthController {
   logout(@Req() request: Request) {
     const authHeader = request.headers.authorization || '';
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    return this.authService.logout(token);
+    return this.authService.logout(token, request.ip);
   }
 }

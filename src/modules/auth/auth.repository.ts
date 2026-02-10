@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class AuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
 
   // Create a new user
   async createUser(data: {
@@ -115,8 +119,13 @@ export class AuthRepository {
   }
 
   // Update user password
-  async updateUserPassword(userId: number, hashedPassword: string) {
-    return this.prisma.user.update({
+  async updateUserPassword(
+    userId: number,
+    hashedPassword: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
       select: {
@@ -136,8 +145,10 @@ export class AuthRepository {
       password?: string;
       isActive?: boolean;
     },
+    tx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.user.update({
+    const client = this.getClient(tx);
+    return client.user.update({
       where: { id: userId },
       data,
       select: {
@@ -153,16 +164,25 @@ export class AuthRepository {
   }
 
   // Update last login timestamp
-  async updateLastLogin(userId: number) {
-    return this.prisma.user.update({
+  async updateLastLogin(
+    userId: number,
+    lastLoginAt: Date = new Date(),
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.user.update({
       where: { id: userId },
-      data: { lastLoginAt: new Date() },
+      data: { lastLoginAt },
     });
   }
 
   // Create a new role
-  async createRole(data: { name: string; description?: string }) {
-    return this.prisma.role.create({
+  async createRole(
+    data: { name: string; description?: string },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.role.create({
       data,
     });
   }
@@ -218,23 +238,33 @@ export class AuthRepository {
   }
 
   // Update role details
-  async updateRole(id: number, data: { name?: string; description?: string }) {
-    return this.prisma.role.update({
+  async updateRole(
+    id: number,
+    data: { name?: string; description?: string },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.role.update({
       where: { id },
       data,
     });
   }
 
   // Delete role
-  async deleteRole(id: number) {
-    return this.prisma.role.delete({
+  async deleteRole(id: number, tx?: Prisma.TransactionClient) {
+    const client = this.getClient(tx);
+    return client.role.delete({
       where: { id },
     });
   }
 
   // Create a new permission
-  async createPermission(data: { code: string; description?: string }) {
-    return this.prisma.permission.create({
+  async createPermission(
+    data: { code: string; description?: string },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.permission.create({
       data,
     });
   }
@@ -267,16 +297,22 @@ export class AuthRepository {
   }
 
   // Delete permission
-  async deletePermission(id: number) {
-    return this.prisma.permission.delete({
+  async deletePermission(id: number, tx?: Prisma.TransactionClient) {
+    const client = this.getClient(tx);
+    return client.permission.delete({
       where: { id },
     });
   }
 
   // Assign permissions to role
-  async assignPermissionsToRole(roleId: number, permissionIds: number[]) {
+  async assignPermissionsToRole(
+    roleId: number,
+    permissionIds: number[],
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
     // Delete existing permissions for the role
-    await this.prisma.rolePermission.deleteMany({
+    await client.rolePermission.deleteMany({
       where: { roleId },
     });
 
@@ -286,14 +322,19 @@ export class AuthRepository {
       permissionId,
     }));
 
-    return this.prisma.rolePermission.createMany({
+    return client.rolePermission.createMany({
       data,
     });
   }
 
   // Remove permission from role
-  async removePermissionFromRole(roleId: number, permissionId: number) {
-    return this.prisma.rolePermission.delete({
+  async removePermissionFromRole(
+    roleId: number,
+    permissionId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.rolePermission.delete({
       where: {
         roleId_permissionId: {
           roleId,
@@ -304,9 +345,14 @@ export class AuthRepository {
   }
 
   // Assign roles to user
-  async assignRolesToUser(userId: number, roleIds: number[]) {
+  async assignRolesToUser(
+    userId: number,
+    roleIds: number[],
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
     // Delete existing roles for the user
-    await this.prisma.userRole.deleteMany({
+    await client.userRole.deleteMany({
       where: { userId },
     });
 
@@ -316,14 +362,19 @@ export class AuthRepository {
       roleId,
     }));
 
-    return this.prisma.userRole.createMany({
+    return client.userRole.createMany({
       data,
     });
   }
 
   // Remove role from user
-  async removeRoleFromUser(userId: number, roleId: number) {
-    return this.prisma.userRole.delete({
+  async removeRoleFromUser(
+    userId: number,
+    roleId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.userRole.delete({
       where: {
         userId_roleId: {
           userId,
