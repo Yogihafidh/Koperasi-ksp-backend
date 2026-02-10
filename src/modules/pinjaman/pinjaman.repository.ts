@@ -1,0 +1,144 @@
+import { Injectable } from '@nestjs/common';
+import {
+  JenisTransaksi,
+  PinjamanStatus,
+  PrismaClient,
+  StatusTransaksi,
+} from '@prisma/client';
+
+@Injectable()
+export class PinjamanRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  findPegawaiByUserId(userId: number) {
+    return this.prisma.pegawai.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        statusAktif: true,
+      },
+    });
+  }
+
+  findNasabahById(id: number) {
+    return this.prisma.nasabah.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+  }
+
+  createPinjaman(data: {
+    nasabahId: number;
+    jumlahPinjaman: number;
+    bungaPersen: number;
+    tenorBulan: number;
+    sisaPinjaman: number;
+    status: PinjamanStatus;
+  }) {
+    return this.prisma.pinjaman.create({
+      data,
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+    });
+  }
+
+  findPinjamanById(id: number) {
+    return this.prisma.pinjaman.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+    });
+  }
+
+  async listPinjamanByNasabah(args: {
+    nasabahId: number;
+    cursor?: number;
+    take: number;
+  }) {
+    const data = await this.prisma.pinjaman.findMany({
+      where: { nasabahId: args.nasabahId, deletedAt: null },
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+      orderBy: { id: 'desc' },
+      take: args.take + 1,
+      ...(args.cursor
+        ? {
+            cursor: { id: args.cursor },
+            skip: 1,
+          }
+        : {}),
+    });
+
+    let nextCursor: number | null = null;
+    if (data.length > args.take) {
+      const nextItem = data.pop();
+      nextCursor = nextItem?.id ?? null;
+    }
+
+    return { data, nextCursor };
+  }
+
+  updatePinjamanStatus(args: {
+    id: number;
+    status: PinjamanStatus;
+    verifiedById?: number;
+    tanggalPersetujuan?: Date | null;
+  }) {
+    return this.prisma.pinjaman.update({
+      where: { id: args.id },
+      data: {
+        status: args.status,
+        verifiedById: args.verifiedById,
+        tanggalPersetujuan: args.tanggalPersetujuan,
+      },
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+    });
+  }
+
+  findPencairanTransaksi(pinjamanId: number) {
+    return this.prisma.transaksi.aggregate({
+      where: {
+        pinjamanId,
+        jenisTransaksi: JenisTransaksi.PENCAIRAN,
+        statusTransaksi: StatusTransaksi.APPROVED,
+      },
+      _sum: {
+        nominal: true,
+      },
+    });
+  }
+
+  createTransaksi(args: {
+    nasabahId: number;
+    pegawaiId: number;
+    pinjamanId: number;
+    jenisTransaksi: JenisTransaksi;
+    nominal: number;
+    tanggal: Date;
+    metodePembayaran: string;
+    statusTransaksi: StatusTransaksi;
+    urlBuktiTransaksi?: string;
+    catatan?: string;
+  }) {
+    return this.prisma.transaksi.create({
+      data: args,
+      include: {
+        nasabah: true,
+        pegawai: true,
+        pinjaman: true,
+      },
+    });
+  }
+}
