@@ -4,7 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { JenisDokumen, JenisSimpanan, NasabahStatus } from '@prisma/client';
+import {
+  AuditAction,
+  JenisDokumen,
+  JenisSimpanan,
+  NasabahStatus,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client';
 import { NasabahRepository } from './nasabah.repository';
 import {
   CreateNasabahDto,
@@ -14,6 +21,7 @@ import {
 } from './dto';
 import { MinioService } from '../../common/storage/minio.service';
 import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
+import { AuditTrailService } from '../audit/audit.service';
 
 type UploadFile = {
   buffer: Buffer;
@@ -33,7 +41,39 @@ export class NasabahService {
   constructor(
     private readonly nasabahRepository: NasabahRepository,
     private readonly minioService: MinioService,
+    private readonly auditTrailService: AuditTrailService,
+    private readonly prisma: PrismaClient,
   ) {}
+
+  private pickNasabahAuditFields(data: {
+    nomorAnggota?: string | null;
+    nama?: string | null;
+    nik?: string | null;
+    alamat?: string | null;
+    noHp?: string | null;
+    pekerjaan?: string | null;
+    instansi?: string | null;
+    penghasilanBulanan?: number | Prisma.Decimal | null;
+    tanggalLahir?: Date | string | null;
+    tanggalDaftar?: Date | string | null;
+    status?: NasabahStatus | null;
+    catatan?: string | null;
+  }) {
+    return {
+      nomorAnggota: data.nomorAnggota ?? null,
+      nama: data.nama ?? null,
+      nik: data.nik ?? null,
+      alamat: data.alamat ?? null,
+      noHp: data.noHp ?? null,
+      pekerjaan: data.pekerjaan ?? null,
+      instansi: data.instansi ?? null,
+      penghasilanBulanan: data.penghasilanBulanan ?? null,
+      tanggalLahir: data.tanggalLahir ?? null,
+      tanggalDaftar: data.tanggalDaftar ?? null,
+      status: data.status ?? null,
+      catatan: data.catatan ?? null,
+    };
+  }
 
   private async generateNomorAnggota() {
     const prefix = 'AGT';
@@ -55,7 +95,11 @@ export class NasabahService {
     throw new BadRequestException('Gagal menghasilkan nomor anggota');
   }
 
-  async createNasabah(dto: CreateNasabahDto, userId: number) {
+  async createNasabah(
+    dto: CreateNasabahDto,
+    userId: number,
+    ipAddress?: string,
+  ) {
     const pegawai = await this.nasabahRepository.findPegawaiByUserId(userId);
     if (!pegawai) {
       throw new NotFoundException('Pegawai tidak ditemukan');
@@ -71,20 +115,52 @@ export class NasabahService {
       ? new Date(dto.tanggalDaftar)
       : new Date();
 
-    const nasabah = await this.nasabahRepository.createNasabah({
-      pegawaiId: pegawai.id,
-      nomorAnggota,
-      nama: dto.nama,
-      nik: dto.nik,
-      alamat: dto.alamat,
-      noHp: dto.noHp,
-      pekerjaan: dto.pekerjaan,
-      instansi: dto.instansi,
-      penghasilanBulanan: dto.penghasilanBulanan,
-      tanggalLahir: new Date(dto.tanggalLahir),
-      tanggalDaftar,
-      status: NasabahStatus.PENDING,
-      catatan: dto.catatan,
+    const nasabah = await this.prisma.$transaction(async (tx) => {
+      const created = await this.nasabahRepository.createNasabah(
+        {
+          pegawaiId: pegawai.id,
+          nomorAnggota,
+          nama: dto.nama,
+          nik: dto.nik,
+          alamat: dto.alamat,
+          noHp: dto.noHp,
+          pekerjaan: dto.pekerjaan,
+          instansi: dto.instansi,
+          penghasilanBulanan: dto.penghasilanBulanan,
+          tanggalLahir: new Date(dto.tanggalLahir),
+          tanggalDaftar,
+          status: NasabahStatus.PENDING,
+          catatan: dto.catatan,
+        },
+        tx,
+      );
+
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.CREATE,
+          entityName: 'Nasabah',
+          entityId: created.id,
+          userId,
+          after: this.pickNasabahAuditFields({
+            nomorAnggota: created.nomorAnggota,
+            nama: created.nama,
+            nik: created.nik,
+            alamat: created.alamat,
+            noHp: created.noHp,
+            pekerjaan: created.pekerjaan,
+            instansi: created.instansi ?? null,
+            penghasilanBulanan: created.penghasilanBulanan,
+            tanggalLahir: created.tanggalLahir,
+            tanggalDaftar: created.tanggalDaftar,
+            status: created.status,
+            catatan: created.catatan ?? null,
+          }),
+          ipAddress,
+        },
+        tx,
+      );
+
+      return created;
     });
 
     return {
@@ -121,15 +197,69 @@ export class NasabahService {
     };
   }
 
-  async updateNasabah(id: number, dto: UpdateNasabahDto) {
+  async updateNasabah(
+    id: number,
+    dto: UpdateNasabahDto,
+    userId: number,
+    ipAddress?: string,
+  ) {
     const nasabah = await this.nasabahRepository.findNasabahById(id);
     if (!nasabah) {
       throw new NotFoundException('Nasabah tidak ditemukan');
     }
 
-    const updated = await this.nasabahRepository.updateNasabah(id, {
-      ...dto,
-      tanggalLahir: dto.tanggalLahir ? new Date(dto.tanggalLahir) : undefined,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.nasabahRepository.updateNasabah(
+        id,
+        {
+          ...dto,
+          tanggalLahir: dto.tanggalLahir
+            ? new Date(dto.tanggalLahir)
+            : undefined,
+        },
+        tx,
+      );
+
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Nasabah',
+          entityId: id,
+          userId,
+          before: this.pickNasabahAuditFields({
+            nomorAnggota: nasabah.nomorAnggota,
+            nama: nasabah.nama,
+            nik: nasabah.nik,
+            alamat: nasabah.alamat,
+            noHp: nasabah.noHp,
+            pekerjaan: nasabah.pekerjaan,
+            instansi: nasabah.instansi ?? null,
+            penghasilanBulanan: nasabah.penghasilanBulanan,
+            tanggalLahir: nasabah.tanggalLahir,
+            tanggalDaftar: nasabah.tanggalDaftar,
+            status: nasabah.status,
+            catatan: nasabah.catatan ?? null,
+          }),
+          after: this.pickNasabahAuditFields({
+            nomorAnggota: result.nomorAnggota,
+            nama: result.nama,
+            nik: result.nik,
+            alamat: result.alamat,
+            noHp: result.noHp,
+            pekerjaan: result.pekerjaan,
+            instansi: result.instansi ?? null,
+            penghasilanBulanan: result.penghasilanBulanan,
+            tanggalLahir: result.tanggalLahir,
+            tanggalDaftar: result.tanggalDaftar,
+            status: result.status,
+            catatan: result.catatan ?? null,
+          }),
+          ipAddress,
+        },
+        tx,
+      );
+
+      return result;
     });
 
     return {
@@ -205,7 +335,7 @@ export class NasabahService {
 
     for (const item of dokumenUploads) {
       const bucket = this.minioService.getBucketNameForJenis(item.jenis);
-      const safeName = item.file.originalname.replace(/\s+/g, '-');
+      const safeName = item.file.originalname.replaceAll(/\s+/g, '-');
       const objectName = `nasabah/${nasabahId}/${item.jenis.toLowerCase()}-${Date.now()}-${safeName}`;
 
       await this.minioService.uploadObject(
@@ -246,7 +376,12 @@ export class NasabahService {
     }
   }
 
-  async verifikasiNasabah(id: number, dto: VerifikasiNasabahDto) {
+  async verifikasiNasabah(
+    id: number,
+    dto: VerifikasiNasabahDto,
+    userId: number,
+    ipAddress?: string,
+  ) {
     const nasabah = await this.nasabahRepository.findNasabahById(id);
     if (!nasabah) {
       throw new NotFoundException('Nasabah tidak ditemukan');
@@ -263,15 +398,33 @@ export class NasabahService {
       throw new BadRequestException('Status verifikasi tidak valid');
     }
 
-    const updated = await this.nasabahRepository.updateNasabahStatus(
-      id,
-      dto.status,
-      dto.catatan,
-    );
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.nasabahRepository.updateNasabahStatus(
+        id,
+        dto.status,
+        dto.catatan,
+        tx,
+      );
 
-    if (dto.status === NasabahStatus.AKTIF) {
-      await this.ensureRekeningSimpanan(id);
-    }
+      if (dto.status === NasabahStatus.AKTIF) {
+        await this.ensureRekeningSimpanan(id, tx);
+      }
+
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Nasabah',
+          entityId: id,
+          userId,
+          before: { status: nasabah.status, catatan: nasabah.catatan ?? null },
+          after: { status: result.status, catatan: result.catatan ?? null },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return result;
+    });
 
     return {
       message: 'Verifikasi nasabah berhasil',
@@ -279,7 +432,12 @@ export class NasabahService {
     };
   }
 
-  async updateStatusNasabah(id: number, dto: UpdateNasabahStatusDto) {
+  async updateStatusNasabah(
+    id: number,
+    dto: UpdateNasabahStatusDto,
+    userId: number,
+    ipAddress?: string,
+  ) {
     const nasabah = await this.nasabahRepository.findNasabahById(id);
     if (!nasabah) {
       throw new NotFoundException('Nasabah tidak ditemukan');
@@ -292,15 +450,33 @@ export class NasabahService {
       throw new BadRequestException('Status keanggotaan tidak valid');
     }
 
-    const updated = await this.nasabahRepository.updateNasabahStatus(
-      id,
-      dto.status,
-      nasabah.catatan ?? undefined,
-    );
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.nasabahRepository.updateNasabahStatus(
+        id,
+        dto.status,
+        nasabah.catatan ?? undefined,
+        tx,
+      );
 
-    if (dto.status === NasabahStatus.AKTIF) {
-      await this.ensureRekeningSimpanan(id);
-    }
+      if (dto.status === NasabahStatus.AKTIF) {
+        await this.ensureRekeningSimpanan(id, tx);
+      }
+
+      await this.auditTrailService.log(
+        {
+          action: AuditAction.UPDATE,
+          entityName: 'Nasabah',
+          entityId: id,
+          userId,
+          before: { status: nasabah.status },
+          after: { status: result.status },
+          ipAddress,
+        },
+        tx,
+      );
+
+      return result;
+    });
 
     return {
       message: 'Status nasabah berhasil diperbarui',
@@ -308,7 +484,10 @@ export class NasabahService {
     };
   }
 
-  private async ensureRekeningSimpanan(nasabahId: number) {
+  private async ensureRekeningSimpanan(
+    nasabahId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
     const jenisList = [
       JenisSimpanan.POKOK,
       JenisSimpanan.WAJIB,
@@ -322,11 +501,14 @@ export class NasabahService {
           jenis,
         );
       if (!existing) {
-        await this.nasabahRepository.createRekeningSimpanan({
-          nasabahId,
-          jenisSimpanan: jenis,
-          saldoBerjalan: 0,
-        });
+        await this.nasabahRepository.createRekeningSimpanan(
+          {
+            nasabahId,
+            jenisSimpanan: jenis,
+            saldoBerjalan: 0,
+          },
+          tx,
+        );
       }
     }
   }

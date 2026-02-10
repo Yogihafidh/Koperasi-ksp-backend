@@ -10,6 +10,7 @@ import {
   Query,
   UploadedFiles,
   UseGuards,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import {
@@ -41,6 +42,7 @@ import {
   ApiConflictExample,
   ApiNotFoundExample,
 } from '../../common/decorators/api-docs.decorator';
+import type { Request } from 'express';
 import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('nasabah')
@@ -80,8 +82,9 @@ export class NasabahController {
   createNasabah(
     @Body() dto: CreateNasabahDto,
     @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.nasabahService.createNasabah(dto, user.userId);
+    return this.nasabahService.createNasabah(dto, user.userId, request.ip);
   }
 
   @Get()
@@ -184,8 +187,10 @@ export class NasabahController {
   updateNasabah(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateNasabahDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.nasabahService.updateNasabah(id, dto);
+    return this.nasabahService.updateNasabah(id, dto, user.userId, request.ip);
   }
 
   @Delete(':id')
@@ -326,8 +331,15 @@ export class NasabahController {
   verifikasiNasabah(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: VerifikasiNasabahDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.nasabahService.verifikasiNasabah(id, dto);
+    return this.nasabahService.verifikasiNasabah(
+      id,
+      dto,
+      user.userId,
+      request.ip,
+    );
   }
 
   @Patch(':id/status')
@@ -364,7 +376,14 @@ export class NasabahController {
   updateStatusNasabah(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateNasabahStatusDto,
+    @CurrentUser() user: UserFromJwt,
+    @Req() request: Request,
   ) {
-    return this.nasabahService.updateStatusNasabah(id, dto);
+    return this.nasabahService.updateStatusNasabah(
+      id,
+      dto,
+      user.userId,
+      request.ip,
+    );
   }
 }

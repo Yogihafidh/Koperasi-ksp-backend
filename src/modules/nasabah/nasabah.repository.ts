@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Prisma,
   PrismaClient,
   NasabahStatus,
   JenisDokumen,
@@ -9,6 +10,10 @@ import {
 @Injectable()
 export class NasabahRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
 
   findPegawaiByUserId(userId: number) {
     return this.prisma.pegawai.findUnique({
@@ -34,22 +39,26 @@ export class NasabahRepository {
     });
   }
 
-  createNasabah(data: {
-    pegawaiId: number;
-    nomorAnggota: string;
-    nama: string;
-    nik: string;
-    alamat: string;
-    noHp: string;
-    pekerjaan: string;
-    instansi?: string;
-    penghasilanBulanan: number;
-    tanggalLahir: Date;
-    tanggalDaftar: Date;
-    status: NasabahStatus;
-    catatan?: string;
-  }) {
-    return this.prisma.nasabah.create({
+  createNasabah(
+    data: {
+      pegawaiId: number;
+      nomorAnggota: string;
+      nama: string;
+      nik: string;
+      alamat: string;
+      noHp: string;
+      pekerjaan: string;
+      instansi?: string;
+      penghasilanBulanan: number;
+      tanggalLahir: Date;
+      tanggalDaftar: Date;
+      status: NasabahStatus;
+      catatan?: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.nasabah.create({
       data,
       include: {
         pegawai: {
@@ -133,8 +142,10 @@ export class NasabahRepository {
       tanggalLahir?: Date;
       catatan?: string;
     },
+    tx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.nasabah.update({
+    const client = this.getClient(tx);
+    return client.nasabah.update({
       where: { id },
       data,
       include: {
@@ -153,8 +164,14 @@ export class NasabahRepository {
     });
   }
 
-  updateNasabahStatus(id: number, status: NasabahStatus, catatan?: string) {
-    return this.prisma.nasabah.update({
+  updateNasabahStatus(
+    id: number,
+    status: NasabahStatus,
+    catatan?: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.nasabah.update({
       where: { id },
       data: { status, catatan },
       include: {
@@ -182,29 +199,38 @@ export class NasabahRepository {
     });
   }
 
-  createRekeningSimpanan(data: {
-    nasabahId: number;
-    jenisSimpanan: JenisSimpanan;
-    saldoBerjalan: number;
-  }) {
-    return this.prisma.rekeningSimpanan.create({
+  createRekeningSimpanan(
+    data: {
+      nasabahId: number;
+      jenisSimpanan: JenisSimpanan;
+      saldoBerjalan: number;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.rekeningSimpanan.create({
       data,
     });
   }
 
-  softDeleteNasabah(id: number) {
-    return this.prisma.nasabah.update({
+  softDeleteNasabah(id: number, tx?: Prisma.TransactionClient) {
+    const client = this.getClient(tx);
+    return client.nasabah.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
-  createNasabahDokumen(data: {
-    nasabahId: number;
-    jenisDokumen: JenisDokumen;
-    fileUrl: string;
-  }) {
-    return this.prisma.nasabahDokumen.create({
+  createNasabahDokumen(
+    data: {
+      nasabahId: number;
+      jenisDokumen: JenisDokumen;
+      fileUrl: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = this.getClient(tx);
+    return client.nasabahDokumen.create({
       data,
     });
   }
