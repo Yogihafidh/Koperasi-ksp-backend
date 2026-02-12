@@ -132,7 +132,7 @@ export class LaporanRepository {
   }
 
   topNasabahByNominal(args: {
-    jenisTransaksi: JenisTransaksi;
+    jenisTransaksi: JenisTransaksi | JenisTransaksi[];
     statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
@@ -269,7 +269,7 @@ export class LaporanRepository {
   }
 
   async countDistinctNasabahTransaksi(args: {
-    jenisTransaksi: JenisTransaksi;
+    jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
     statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
@@ -286,6 +286,18 @@ export class LaporanRepository {
     });
 
     return grouped.length;
+  }
+
+  topNasabahBySaldoSimpanan(take: number) {
+    return this.prisma.rekeningSimpanan.groupBy({
+      by: ['nasabahId'],
+      where: { deletedAt: null },
+      _sum: { saldoBerjalan: true },
+      orderBy: {
+        _sum: { saldoBerjalan: 'desc' },
+      },
+      take,
+    });
   }
 
   groupSaldoSimpananByJenis() {
