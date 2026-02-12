@@ -9,8 +9,6 @@ import {
 } from '@prisma/client';
 import { LaporanRepository } from './laporan.repository';
 
-const SMALL_SALDO_THRESHOLD = 100000;
-
 @Injectable()
 export class LaporanService {
   constructor(private readonly laporanRepository: LaporanRepository) {}
@@ -49,8 +47,85 @@ export class LaporanService {
     }, {});
   }
 
+  private safeDivide(numerator: number, denominator: number) {
+    if (denominator <= 0) {
+      return null;
+    }
+    return numerator / denominator;
+  }
+
+  private calculateGrowth(current: number, previous: number) {
+    if (previous <= 0) {
+      return null;
+    }
+    return (current - previous) / previous;
+  }
+
+  private formatGrowthText(growth: number | null) {
+    if (growth === null) {
+      return 'Belum ada data pembanding bulan lalu';
+    }
+    if (growth === 0) {
+      return 'Stabil dibanding bulan lalu';
+    }
+    const percent = Math.abs(Math.round(growth * 100));
+    if (growth > 0) {
+      return `Mengalami kenaikan ${percent}% dari bulan lalu`;
+    }
+    return `Mengalami penurunan ${percent}% dari bulan lalu`;
+  }
+
   private buildRatioKpi(value: number | null, status: string) {
     return { value, status };
+  }
+
+  private getLikuiditasStatus(value: number | null) {
+    if (value === null) {
+      return 'N/A';
+    }
+    if (value > 1.5) {
+      return 'SEHAT';
+    }
+    if (value >= 1) {
+      return 'WASPADA';
+    }
+    return 'RISIKO';
+  }
+
+  private getKreditAktifStatus(value: number | null) {
+    if (value === null) {
+      return 'N/A';
+    }
+    if (value < 0.7) {
+      return 'AMAN';
+    }
+    if (value <= 0.9) {
+      return 'TINGGI';
+    }
+    return 'AGRESIF';
+  }
+
+  private getPembayaranStatus(value: number | null) {
+    if (value === null) {
+      return 'N/A';
+    }
+    if (value > 0.08) {
+      return 'LANCAR';
+    }
+    if (value >= 0.04) {
+      return 'MONITORING';
+    }
+    return 'RISIKO';
+  }
+
+  private getNetCashflowStatus(value: number) {
+    if (value > 0) {
+      return 'SURPLUS';
+    }
+    if (value === 0) {
+      return 'BREAK_EVEN';
+    }
+    return 'DEFISIT';
   }
 
   private calculateKpi(args: {
@@ -64,67 +139,35 @@ export class LaporanService {
     totalAnggota: number;
     netCashflow: number;
   }) {
-    const rasioLikuiditas =
-      args.totalPenarikan > 0 ? args.saldoAkhir / args.totalPenarikan : null;
-    const rasioLikuiditasStatus =
-      rasioLikuiditas === null
-        ? 'N/A'
-        : rasioLikuiditas > 1.5
-          ? 'SEHAT'
-          : rasioLikuiditas >= 1.0
-            ? 'WASPADA'
-            : 'RISIKO';
-
-    const rasioKreditAktif =
-      args.totalSimpanan > 0
-        ? args.totalPinjamanAktif / args.totalSimpanan
-        : null;
-    const rasioKreditAktifStatus =
-      rasioKreditAktif === null
-        ? 'N/A'
-        : rasioKreditAktif < 0.7
-          ? 'AMAN'
-          : rasioKreditAktif <= 0.9
-            ? 'TINGGI'
-            : 'AGRESIF';
-
-    const rasioPembayaran =
-      args.totalPinjamanAktif > 0
-        ? args.totalAngsuran / args.totalPinjamanAktif
-        : null;
-    const rasioPembayaranStatus =
-      rasioPembayaran === null
-        ? 'N/A'
-        : rasioPembayaran > 0.08
-          ? 'LANCAR'
-          : rasioPembayaran >= 0.04
-            ? 'MONITORING'
-            : 'RISIKO';
-
-    const pertumbuhanAnggota =
-      args.totalAnggota > 0
-        ? (args.anggotaBaru - args.anggotaKeluar) / args.totalAnggota
-        : null;
-
-    const netCashflowStatus =
-      args.netCashflow > 0
-        ? 'SURPLUS'
-        : args.netCashflow === 0
-          ? 'BREAK_EVEN'
-          : 'DEFISIT';
+    const rasioLikuiditas = this.safeDivide(
+      args.saldoAkhir,
+      args.totalPenarikan,
+    );
+    const rasioKreditAktif = this.safeDivide(
+      args.totalPinjamanAktif,
+      args.totalSimpanan,
+    );
+    const rasioPembayaran = this.safeDivide(
+      args.totalAngsuran,
+      args.totalPinjamanAktif,
+    );
+    const pertumbuhanAnggota = this.safeDivide(
+      args.anggotaBaru - args.anggotaKeluar,
+      args.totalAnggota,
+    );
 
     return {
       rasioLikuiditas: this.buildRatioKpi(
         rasioLikuiditas,
-        rasioLikuiditasStatus,
+        this.getLikuiditasStatus(rasioLikuiditas),
       ),
       rasioKreditAktif: this.buildRatioKpi(
         rasioKreditAktif,
-        rasioKreditAktifStatus,
+        this.getKreditAktifStatus(rasioKreditAktif),
       ),
       rasioPembayaranLancar: this.buildRatioKpi(
         rasioPembayaran,
-        rasioPembayaranStatus,
+        this.getPembayaranStatus(rasioPembayaran),
       ),
       pertumbuhanAnggota: this.buildRatioKpi(
         pertumbuhanAnggota,
@@ -132,7 +175,7 @@ export class LaporanService {
       ),
       netCashflow: {
         value: args.netCashflow,
-        status: netCashflowStatus,
+        status: this.getNetCashflowStatus(args.netCashflow),
       },
     };
   }
@@ -293,41 +336,102 @@ export class LaporanService {
 
   async getLaporanAngsuran(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
-    const [totalAgg, countAgg, angsuranLunas] = await Promise.all([
-      this.laporanRepository.sumTransaksiNominal({
+    const totalAgg = await this.laporanRepository.sumTransaksiNominal({
+      jenisTransaksi: JenisTransaksi.ANGSURAN,
+      statusTransaksi: StatusTransaksi.APPROVED,
+      tanggalFrom: start,
+      tanggalTo: end,
+    });
+    const countAgg = await this.laporanRepository.countTransaksi({
+      jenisTransaksi: JenisTransaksi.ANGSURAN,
+      statusTransaksi: StatusTransaksi.APPROVED,
+      tanggalFrom: start,
+      tanggalTo: end,
+    });
+    const totalPinjamanAktifAgg =
+      await this.laporanRepository.sumPinjamanAktifNominal();
+    const totalPencairanAgg = await this.laporanRepository.sumTransaksiNominal({
+      jenisTransaksi: JenisTransaksi.PENCAIRAN,
+      statusTransaksi: StatusTransaksi.APPROVED,
+      tanggalFrom: start,
+      tanggalTo: end,
+    });
+    const jumlahPeminjam =
+      await this.laporanRepository.countDistinctNasabahTransaksi({
         jenisTransaksi: JenisTransaksi.ANGSURAN,
         statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
-      }),
-      this.laporanRepository.countTransaksi({
-        jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.countAngsuranLunasInPeriod({
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-    ]);
+      });
+
+    const totalAngsuranMasuk = this.toNumber(totalAgg._sum.nominal);
+    const jumlahTransaksi = countAgg._count._all;
+    const totalPinjamanAktif = this.toNumber(
+      totalPinjamanAktifAgg._sum.sisaPinjaman,
+    );
+    const totalPencairanBulanIni = this.toNumber(
+      totalPencairanAgg._sum.nominal,
+    );
+    const rataRataAngsuran = this.safeDivide(
+      totalAngsuranMasuk,
+      jumlahTransaksi,
+    );
+    const rasioPembayaranLancar = this.safeDivide(
+      totalAngsuranMasuk,
+      totalPinjamanAktif,
+    );
+    const coverageTerhadapPencairan = this.safeDivide(
+      totalAngsuranMasuk,
+      totalPencairanBulanIni,
+    );
+    const rataRataPerPeminjam = this.safeDivide(
+      totalAngsuranMasuk,
+      jumlahPeminjam,
+    );
+
+    let kpiStatus = 'SEHAT';
+    if ((rasioPembayaranLancar ?? 0) < 0.04) {
+      kpiStatus = 'RISIKO';
+    } else if ((rasioPembayaranLancar ?? 0) < 0.08) {
+      kpiStatus = 'WASPADA';
+    }
+
+    const interpretasiKredit =
+      coverageTerhadapPencairan !== null && coverageTerhadapPencairan >= 1
+        ? 'Pembayaran stabil dan mampu menutup pencairan bulan ini'
+        : 'Pencairan lebih besar dari angsuran, perlu monitoring';
+    let risikoKredit = 'Rendah';
+    if (kpiStatus === 'WASPADA') {
+      risikoKredit = 'Sedang';
+    } else if (kpiStatus === 'RISIKO') {
+      risikoKredit = 'Tinggi';
+    }
 
     return {
       message: 'Berhasil mengambil laporan angsuran',
       data: {
         periode: { bulan, tahun },
-        totalAngsuranMasuk: this.toNumber(totalAgg._sum.nominal),
-        jumlahTransaksi: countAgg._count._all,
-        angsuranLunas,
-        anggotaTerlambat: 0,
-        totalDenda: 0,
+        summary: {
+          totalAngsuranMasuk,
+          jumlahTransaksi,
+          rataRataAngsuran,
+        },
+        metrics: {
+          rasioPembayaranLancar,
+          coverageTerhadapPencairan,
+          rataRataPerPeminjam,
+        },
+        insight: {
+          interpretasiKredit,
+          risikoKredit,
+        },
+        kpiStatus,
       },
     };
   }
 
   async getLaporanPenarikan(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
-
     const totalAgg = await this.laporanRepository.sumTransaksiNominal({
       jenisTransaksi: JenisTransaksi.PENARIKAN,
       statusTransaksi: StatusTransaksi.APPROVED,
@@ -339,129 +443,177 @@ export class LaporanService {
       tanggalFrom: start,
       tanggalTo: end,
     });
-    const statusGrouped = await this.laporanRepository.groupTransaksiByStatus({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const maxAgg = await this.laporanRepository.maxTransaksiNominal({
+    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
+    const topNasabahNominal = await this.laporanRepository.topNasabahByNominal({
       jenisTransaksi: JenisTransaksi.PENARIKAN,
       statusTransaksi: StatusTransaksi.APPROVED,
       tanggalFrom: start,
       tanggalTo: end,
+      take: 3,
     });
-    const topNasabah = await this.laporanRepository.topNasabahByTransaksi({
+
+    const totalPenarikan = this.toNumber(totalAgg._sum.nominal);
+    const jumlahTransaksi = totalCount._count._all;
+    const rataRataPenarikan = this.safeDivide(totalPenarikan, jumlahTransaksi);
+    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
+    const rasioTerhadapSimpanan = this.safeDivide(
+      totalPenarikan,
+      totalSimpanan,
+    );
+
+    const { start: prevStart, end: prevEnd } = this.getMonthRange(
+      bulan === 1 ? 12 : bulan - 1,
+      bulan === 1 ? tahun - 1 : tahun,
+    );
+    const prevAgg = await this.laporanRepository.sumTransaksiNominal({
       jenisTransaksi: JenisTransaksi.PENARIKAN,
       statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-      take: 1,
+      tanggalFrom: prevStart,
+      tanggalTo: prevEnd,
     });
+    const prevTotal = this.toNumber(prevAgg._sum.nominal);
+    const growthDariBulanLalu = this.calculateGrowth(totalPenarikan, prevTotal);
 
-    const statusMap: Record<string, number> = {
-      APPROVED: 0,
-      REJECTED: 0,
-      PENDING: 0,
-    };
+    const top3Total = topNasabahNominal.reduce((acc, row) => {
+      return acc + this.toNumber(row._sum.nominal);
+    }, 0);
+    const konsentrasiTop3 = this.safeDivide(top3Total, totalPenarikan);
 
-    for (const row of statusGrouped) {
-      statusMap[row.statusTransaksi] = row._count._all;
+    let kpiStatus = 'AMAN';
+    const ratioValue = rasioTerhadapSimpanan ?? 0;
+    if (ratioValue >= 0.4) {
+      kpiStatus = 'RISIKO';
+    } else if (ratioValue >= 0.2) {
+      kpiStatus = 'WASPADA';
     }
 
-    type TopNasabahRow = { nasabahId: number; _count: { _all: number } };
-    const topNasabahRows = topNasabah as TopNasabahRow[];
-    const topNasabahIds = topNasabahRows.map((row) => row.nasabahId);
-    const nasabahList = topNasabahIds.length
-      ? await this.laporanRepository.findNasabahByIds(topNasabahIds)
-      : [];
-    type NasabahSummary = { nama: string; nomorAnggota: string };
-    const nasabahMap = nasabahList.reduce<Record<number, NasabahSummary>>(
-      (acc, item) => {
-        acc[item.id] = { nama: item.nama, nomorAnggota: item.nomorAnggota };
-        return acc;
-      },
-      {},
-    );
-    const topCount = topNasabahRows[0]?._count._all ?? 0;
-
-    const anggotaPalingSeringMenarik = topNasabahRows[0]
-      ? {
-          nasabahId: topNasabahRows[0].nasabahId,
-          nama: nasabahMap[topNasabahRows[0].nasabahId]?.nama ?? null,
-          nomorAnggota:
-            nasabahMap[topNasabahRows[0].nasabahId]?.nomorAnggota ?? null,
-          totalTransaksi: topCount,
-        }
-      : null;
+    let interpretasiLikuiditas = 'Penarikan masih dalam batas aman';
+    if (kpiStatus === 'WASPADA') {
+      interpretasiLikuiditas = 'Tekanan likuiditas mulai meningkat';
+    } else if (kpiStatus === 'RISIKO') {
+      interpretasiLikuiditas = 'Penarikan terlalu tinggi dan berisiko';
+    }
 
     return {
       message: 'Berhasil mengambil laporan penarikan',
       data: {
         periode: { bulan, tahun },
-        totalPenarikan: this.toNumber(totalAgg._sum.nominal),
-        jumlahTransaksi: totalCount._count._all,
-        disetujui: statusMap.APPROVED,
-        ditolak: statusMap.REJECTED,
-        penarikanTerbesar: this.toNumber(maxAgg._max.nominal),
-        anggotaPalingSeringMenarik,
+        summary: {
+          totalPenarikan,
+          jumlahTransaksi,
+          rataRataPenarikan,
+        },
+        metrics: {
+          rasioTerhadapSimpanan,
+          growthDariBulanLalu,
+          konsentrasiTop3,
+        },
+        insight: {
+          interpretasiLikuiditas,
+          tren: this.formatGrowthText(growthDariBulanLalu),
+        },
+        kpiStatus,
       },
     };
   }
 
   async getLaporanPinjaman(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
-
     const totalPinjamanAktif =
       await this.laporanRepository.countPinjamanAktif();
+    const totalPinjamanAktifAgg =
+      await this.laporanRepository.sumPinjamanAktifNominal();
     const pinjamanBaru = await this.laporanRepository.countPinjamanBaru({
       tanggalFrom: start,
       tanggalTo: end,
     });
-    const pinjamanAgg = await this.laporanRepository.aggregatePinjamanPeriode({
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const tenorUmum = await this.laporanRepository.groupPinjamanTenor({
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
+    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
+    const topOutstanding =
+      await this.laporanRepository.listTopOutstandingPinjaman(5);
 
-    const tenorData = tenorUmum[0]
-      ? {
-          tenorBulan: tenorUmum[0].tenorBulan,
-          jumlah: tenorUmum[0]._count._all,
-        }
-      : null;
+    const totalOutstanding = this.toNumber(
+      totalPinjamanAktifAgg._sum.sisaPinjaman,
+    );
+    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
+    const rasioPinjamanTerhadapSimpanan = this.safeDivide(
+      totalOutstanding,
+      totalSimpanan,
+    );
+    const top5Outstanding = topOutstanding.reduce((acc, item) => {
+      return acc + this.toNumber(item.sisaPinjaman);
+    }, 0);
+    const konsentrasiTop5 = this.safeDivide(top5Outstanding, totalOutstanding);
+    const rataRataOutstanding = this.safeDivide(
+      totalOutstanding,
+      totalPinjamanAktif,
+    );
+
+    let kpiStatus = 'STABIL';
+    const ratioValue = rasioPinjamanTerhadapSimpanan ?? 0;
+    if (ratioValue > 0.85) {
+      kpiStatus = 'RISIKO';
+    } else if (ratioValue >= 0.7) {
+      kpiStatus = 'WASPADA';
+    }
+
+    let ekspansiKredit = 'Masih dalam batas sehat';
+    if (kpiStatus === 'WASPADA') {
+      ekspansiKredit = 'Mulai mendekati batas aman';
+    } else if (kpiStatus === 'RISIKO') {
+      ekspansiKredit = 'Ekspansi terlalu agresif';
+    }
+    let risikoKonsentrasi = 'Rendah';
+    const konsentrasiValue = konsentrasiTop5 ?? 0;
+    if (konsentrasiValue > 0.6) {
+      risikoKonsentrasi = 'Tinggi';
+    } else if (konsentrasiValue >= 0.4) {
+      risikoKonsentrasi = 'Sedang';
+    }
 
     return {
       message: 'Berhasil mengambil laporan pinjaman',
       data: {
         periode: { bulan, tahun },
-        totalPinjamanAktif,
-        pinjamanBaru,
-        totalDanaDipinjamkan: this.toNumber(pinjamanAgg._sum.jumlahPinjaman),
-        pinjamanTerkecil: this.toNumber(pinjamanAgg._min.jumlahPinjaman),
-        pinjamanTerbesar: this.toNumber(pinjamanAgg._max.jumlahPinjaman),
-        bungaRataRata: this.toNumber(pinjamanAgg._avg.bungaPersen),
-        tenorUmum: tenorData,
+        summary: {
+          totalPinjamanAktif,
+          totalOutstanding,
+          pinjamanBaru,
+        },
+        metrics: {
+          rasioPinjamanTerhadapSimpanan,
+          konsentrasiTop5,
+          rataRataOutstanding,
+        },
+        insight: {
+          ekspansiKredit,
+          risikoKonsentrasi,
+        },
+        kpiStatus,
       },
     };
   }
 
   async getLaporanSimpanan(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
-
     const saldoGrouped =
       await this.laporanRepository.groupSaldoSimpananByJenis();
-    const belumSetorWajib =
-      await this.laporanRepository.countRekeningWajibBelumSetor({
-        tanggalFrom: start,
-        tanggalTo: end,
-      });
-    const saldoKecil = await this.laporanRepository.countRekeningSaldoKecil(
-      SMALL_SALDO_THRESHOLD,
-    );
-    const saldoTertinggiAgg = await this.laporanRepository.maxSaldoSimpanan();
+    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
+    const setoranAgg = await this.laporanRepository.sumTransaksiNominal({
+      jenisTransaksi: JenisTransaksi.SETORAN,
+      statusTransaksi: StatusTransaksi.APPROVED,
+      tanggalFrom: start,
+      tanggalTo: end,
+    });
+    const penarikanAgg = await this.laporanRepository.sumTransaksiNominal({
+      jenisTransaksi: JenisTransaksi.PENARIKAN,
+      statusTransaksi: StatusTransaksi.APPROVED,
+      tanggalFrom: start,
+      tanggalTo: end,
+    });
+    const anggotaAktif = await this.laporanRepository.countNasabah({
+      deletedAt: null,
+      status: NasabahStatus.AKTIF,
+    });
 
     const saldoMap: Record<string, number> = {
       [JenisSimpanan.POKOK]: 0,
@@ -473,17 +625,64 @@ export class LaporanService {
       saldoMap[row.jenisSimpanan] = this.toNumber(row._sum.saldoBerjalan);
     }
 
+    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
+    const totalSetoran = this.toNumber(setoranAgg._sum.nominal);
+    const totalPenarikan = this.toNumber(penarikanAgg._sum.nominal);
+    const prevTotal = totalSimpanan - (totalSetoran - totalPenarikan);
+    const growthSimpanan = this.calculateGrowth(totalSimpanan, prevTotal);
+    const rasioSukarela = this.safeDivide(
+      saldoMap[JenisSimpanan.SUKARELA],
+      totalSimpanan,
+    );
+    const rataRataSaldoAnggota = this.safeDivide(totalSimpanan, anggotaAktif);
+
+    let pertumbuhanDana = 'Belum ada data pembanding bulan lalu';
+    if (growthSimpanan !== null) {
+      if (growthSimpanan > 0) {
+        pertumbuhanDana = `Simpanan tumbuh ${Math.round(growthSimpanan * 100)}% dari bulan lalu`;
+      } else if (growthSimpanan < 0) {
+        pertumbuhanDana = `Simpanan turun ${Math.round(Math.abs(growthSimpanan) * 100)}% dari bulan lalu`;
+      } else {
+        pertumbuhanDana = 'Simpanan stabil dibanding bulan lalu';
+      }
+    }
+    let kepercayaanAnggota = 'Cukup baik';
+    const sukarelaValue = rasioSukarela ?? 0;
+    if (sukarelaValue >= 0.2) {
+      kepercayaanAnggota = 'Baik';
+    } else if (sukarelaValue < 0.1) {
+      kepercayaanAnggota = 'Rendah';
+    }
+
+    let kpiStatus = 'BERTUMBUH';
+    if (growthSimpanan === null) {
+      kpiStatus = 'N/A';
+    } else if (growthSimpanan < 0) {
+      kpiStatus = 'MENURUN';
+    } else if (growthSimpanan === 0) {
+      kpiStatus = 'STAGNAN';
+    }
+
     return {
       message: 'Berhasil mengambil laporan simpanan',
       data: {
         periode: { bulan, tahun },
-        simpananPokok: saldoMap[JenisSimpanan.POKOK],
-        simpananWajib: saldoMap[JenisSimpanan.WAJIB],
-        simpananSukarela: saldoMap[JenisSimpanan.SUKARELA],
-        belumSetorWajib,
-        saldoKecil: saldoKecil,
-        saldoTertinggi: this.toNumber(saldoTertinggiAgg._max.saldoBerjalan),
-        tenorUmum: null,
+        summary: {
+          totalSimpanan,
+          simpananPokok: saldoMap[JenisSimpanan.POKOK],
+          simpananWajib: saldoMap[JenisSimpanan.WAJIB],
+          simpananSukarela: saldoMap[JenisSimpanan.SUKARELA],
+        },
+        metrics: {
+          growthSimpanan,
+          rasioSukarela,
+          rataRataSaldoAnggota,
+        },
+        insight: {
+          pertumbuhanDana,
+          kepercayaanAnggota,
+        },
+        kpiStatus,
       },
     };
   }
