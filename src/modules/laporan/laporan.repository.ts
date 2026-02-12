@@ -131,6 +131,29 @@ export class LaporanRepository {
     });
   }
 
+  topNasabahByNominal(args: {
+    jenisTransaksi: JenisTransaksi;
+    statusTransaksi?: StatusTransaksi;
+    tanggalFrom?: Date;
+    tanggalTo?: Date;
+    take?: number;
+  }) {
+    return this.prisma.transaksi.groupBy({
+      by: ['nasabahId'],
+      where: this.buildTransaksiWhere({
+        jenisTransaksi: args.jenisTransaksi,
+        statusTransaksi: args.statusTransaksi,
+        tanggalFrom: args.tanggalFrom,
+        tanggalTo: args.tanggalTo,
+      }),
+      _sum: { nominal: true },
+      orderBy: {
+        _sum: { nominal: 'desc' },
+      },
+      take: args.take ?? 1,
+    });
+  }
+
   findNasabahByIds(ids: number[]) {
     return this.prisma.nasabah.findMany({
       where: { id: { in: ids }, deletedAt: null },
@@ -156,6 +179,19 @@ export class LaporanRepository {
         sisaPinjaman: { gt: new Prisma.Decimal(0) },
       },
       _sum: { sisaPinjaman: true },
+    });
+  }
+
+  listTopOutstandingPinjaman(take: number) {
+    return this.prisma.pinjaman.findMany({
+      where: {
+        deletedAt: null,
+        status: PinjamanStatus.DISETUJUI,
+        sisaPinjaman: { gt: new Prisma.Decimal(0) },
+      },
+      select: { sisaPinjaman: true },
+      orderBy: { sisaPinjaman: 'desc' },
+      take,
     });
   }
 
@@ -226,6 +262,26 @@ export class LaporanRepository {
         },
       },
       by: ['pinjamanId'],
+      _count: { _all: true },
+    });
+
+    return grouped.length;
+  }
+
+  async countDistinctNasabahTransaksi(args: {
+    jenisTransaksi: JenisTransaksi;
+    statusTransaksi?: StatusTransaksi;
+    tanggalFrom?: Date;
+    tanggalTo?: Date;
+  }) {
+    const grouped = await this.prisma.transaksi.groupBy({
+      by: ['nasabahId'],
+      where: this.buildTransaksiWhere({
+        jenisTransaksi: args.jenisTransaksi,
+        statusTransaksi: args.statusTransaksi,
+        tanggalFrom: args.tanggalFrom,
+        tanggalTo: args.tanggalTo,
+      }),
       _count: { _all: true },
     });
 
