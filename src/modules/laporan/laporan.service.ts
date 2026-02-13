@@ -296,6 +296,243 @@ export class LaporanService {
     return rekomendasi;
   }
 
+  private getLikuiditasRisk(value: number | null) {
+    if (value === null) {
+      return { status: 'N/A', level: 'N/A' };
+    }
+    if (value > 2) {
+      return { status: 'AMAN', level: 'RENDAH' };
+    }
+    if (value >= 1) {
+      return { status: 'WASPADA', level: 'SEDANG' };
+    }
+    return { status: 'RISIKO', level: 'TINGGI' };
+  }
+
+  private getEkspansiKreditRisk(value: number | null) {
+    if (value === null) {
+      return { status: 'N/A', level: 'N/A' };
+    }
+    if (value < 0.7) {
+      return { status: 'AMAN', level: 'RENDAH' };
+    }
+    if (value <= 0.9) {
+      return { status: 'WASPADA', level: 'SEDANG' };
+    }
+    return { status: 'RISIKO', level: 'TINGGI' };
+  }
+
+  private getArusKasRisk(netCashflow: number) {
+    if (netCashflow > 0) {
+      return { status: 'POSITIF', level: 'SEHAT' };
+    }
+    if (netCashflow === 0) {
+      return { status: 'NETRAL', level: 'CUKUP' };
+    }
+    return { status: 'NEGATIF', level: 'RISIKO' };
+  }
+
+  private getKonsentrasiKreditRisk(value: number | null) {
+    if (value === null) {
+      return { status: 'N/A', level: 'N/A' };
+    }
+    if (value < 0.4) {
+      return { status: 'RENDAH', level: 'TERKONTROL' };
+    }
+    if (value <= 0.6) {
+      return { status: 'SEDANG', level: 'TERKONTROL' };
+    }
+    return { status: 'TINGGI', level: 'TIDAK TERKONTROL' };
+  }
+
+  private getAktivitasAnggotaRisk(
+    rasioKeaktifan: number | null,
+    rasioPartisipasi: number | null,
+  ) {
+    if (rasioKeaktifan === null || rasioPartisipasi === null) {
+      return { status: 'N/A', level: 'N/A' };
+    }
+    if (rasioKeaktifan >= 0.8 && rasioPartisipasi >= 0.7) {
+      return { status: 'AKTIF', level: 'BAIK' };
+    }
+    if (rasioKeaktifan >= 0.7 || rasioPartisipasi >= 0.6) {
+      return { status: 'STABIL', level: 'CUKUP BAIK' };
+    }
+    return { status: 'LEMAH', level: 'RISIKO' };
+  }
+
+  private buildExecutiveInsight(args: {
+    growthSimpanan: number | null;
+    growthPinjaman: number | null;
+    rasioLikuiditas: number | null;
+    rasioKreditAktif: number | null;
+    netCashflow: number;
+  }) {
+    const parts: string[] = [];
+
+    if (args.growthSimpanan === null) {
+      parts.push(
+        'Pertumbuhan simpanan belum dapat dibandingkan dengan bulan lalu.',
+      );
+    } else {
+      const percent = Math.abs(Math.round(args.growthSimpanan * 100));
+      const arah = args.growthSimpanan >= 0 ? 'meningkat' : 'menurun';
+      parts.push(`Pertumbuhan simpanan ${arah} ${percent}%.`);
+    }
+
+    if (args.rasioLikuiditas === null) {
+      parts.push('Likuiditas belum dapat diukur secara akurat.');
+    } else {
+      parts.push(
+        `Likuiditas berada di level ${this.roundTo(args.rasioLikuiditas, 1)}x.`,
+      );
+    }
+
+    if (args.growthPinjaman !== null) {
+      const percent = Math.abs(Math.round(args.growthPinjaman * 100));
+      const arah = args.growthPinjaman >= 0 ? 'meningkat' : 'menurun';
+      parts.push(`Ekspansi kredit ${arah} ${percent}%.`);
+    }
+
+    if (args.rasioKreditAktif !== null) {
+      parts.push(
+        `Rasio kredit terhadap simpanan berada pada ${this.roundTo(args.rasioKreditAktif, 2)}.`,
+      );
+    }
+
+    if (args.netCashflow > 0) {
+      parts.push(`Arus kas bulan ini positif sebesar ${args.netCashflow}.`);
+    } else if (args.netCashflow < 0) {
+      parts.push(
+        `Arus kas bulan ini defisit sebesar ${Math.abs(args.netCashflow)}.`,
+      );
+    } else {
+      parts.push('Arus kas bulan ini berada pada titik impas.');
+    }
+
+    return parts.join(' ');
+  }
+
+  private getScoreLikuiditas(value: number | null) {
+    if (value === null) {
+      return 50;
+    }
+    if (value > 2) {
+      return 100;
+    }
+    if (value >= 1) {
+      return 70;
+    }
+    return 40;
+  }
+
+  private getScoreKredit(value: number | null) {
+    if (value === null) {
+      return 50;
+    }
+    if (value < 0.7) {
+      return 100;
+    }
+    if (value <= 0.9) {
+      return 70;
+    }
+    return 40;
+  }
+
+  private getScoreCashflow(
+    netCashflow: number,
+    rasioPengeluaran: number | null,
+  ) {
+    if (rasioPengeluaran === null) {
+      return 50;
+    }
+    const positif = netCashflow > 0;
+    const efisien = rasioPengeluaran <= 1;
+    if (positif && efisien) {
+      return 100;
+    }
+    if (positif || efisien) {
+      return 70;
+    }
+    return 40;
+  }
+
+  private getScoreAnggota(
+    rasioKeaktifan: number | null,
+    rasioPartisipasi: number | null,
+  ) {
+    if (rasioKeaktifan === null || rasioPartisipasi === null) {
+      return 50;
+    }
+    if (rasioKeaktifan >= 0.75 && rasioPartisipasi >= 0.6) {
+      return 100;
+    }
+    if (rasioKeaktifan >= 0.75 || rasioPartisipasi >= 0.6) {
+      return 70;
+    }
+    return 40;
+  }
+
+  private getScoreGrowth(values: Array<number | null>) {
+    const valid = values.filter((value): value is number => value !== null);
+    if (valid.length === 0) {
+      return 50;
+    }
+    const avg = valid.reduce((acc, val) => acc + val, 0) / valid.length;
+    if (avg > 0) {
+      return 100;
+    }
+    if (avg >= -0.05) {
+      return 70;
+    }
+    return 40;
+  }
+
+  private calculateHealthScore(args: {
+    rasioLikuiditas: number | null;
+    rasioKreditAktif: number | null;
+    rasioPengeluaran: number | null;
+    netCashflow: number;
+    rasioKeaktifan: number | null;
+    rasioPartisipasiTransaksi: number | null;
+    growthValues: Array<number | null>;
+  }) {
+    const scoreLikuiditas = this.getScoreLikuiditas(args.rasioLikuiditas);
+    const scoreKredit = this.getScoreKredit(args.rasioKreditAktif);
+    const scoreCashflow = this.getScoreCashflow(
+      args.netCashflow,
+      args.rasioPengeluaran,
+    );
+    const scoreAnggota = this.getScoreAnggota(
+      args.rasioKeaktifan,
+      args.rasioPartisipasiTransaksi,
+    );
+    const scoreGrowth = this.getScoreGrowth(args.growthValues);
+
+    const value = Math.round(
+      scoreLikuiditas * 0.3 +
+        scoreKredit * 0.25 +
+        scoreCashflow * 0.2 +
+        scoreAnggota * 0.15 +
+        scoreGrowth * 0.1,
+    );
+
+    let grade = 'D';
+    let status = 'RISIKO';
+    if (value >= 85) {
+      grade = 'A';
+      status = 'SANGAT SEHAT';
+    } else if (value >= 70) {
+      grade = 'B';
+      status = 'SEHAT';
+    } else if (value >= 55) {
+      grade = 'C';
+      status = 'WASPADA';
+    }
+
+    return { value, grade, status };
+  }
+
   private buildRatioKpi(value: number | null, status: string) {
     return { value, status };
   }
@@ -403,6 +640,9 @@ export class LaporanService {
 
   async getLaporanBulanan(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
+    const prev = this.shiftMonth(bulan, tahun, -1);
+    const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
+    const allJenis = Object.values(JenisTransaksi) as JenisTransaksi[];
 
     const [
       simpananAgg,
@@ -417,6 +657,15 @@ export class LaporanService {
       anggotaBaru,
       anggotaKeluar,
       saldoAwal,
+      totalTransaksiAgg,
+      anggotaDenganPinjamanAktif,
+      anggotaDenganTransaksi,
+      topOutstanding,
+      totalPinjamanAktifCount,
+      prevSimpananAgg,
+      prevPinjamanAgg,
+      prevTransaksiAgg,
+      prevTotalAnggota,
     ] = await Promise.all([
       this.laporanRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.SETORAN,
@@ -465,6 +714,39 @@ export class LaporanService {
         updatedAt: { gte: start, lte: end },
       }),
       this.getSaldoAwal(bulan, tahun),
+      this.laporanRepository.countTransaksi({
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: start,
+        tanggalTo: end,
+      }),
+      this.laporanRepository.countNasabahWithPinjamanAktif(),
+      this.laporanRepository.countDistinctNasabahTransaksi({
+        jenisTransaksi: allJenis,
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: start,
+        tanggalTo: end,
+      }),
+      this.laporanRepository.listTopOutstandingPinjaman(5),
+      this.laporanRepository.countPinjamanAktif(),
+      this.laporanRepository.sumTransaksiNominal({
+        jenisTransaksi: JenisTransaksi.SETORAN,
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: prevRange.start,
+        tanggalTo: prevRange.end,
+      }),
+      this.laporanRepository.aggregatePinjamanPeriode({
+        tanggalFrom: prevRange.start,
+        tanggalTo: prevRange.end,
+      }),
+      this.laporanRepository.countTransaksi({
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: prevRange.start,
+        tanggalTo: prevRange.end,
+      }),
+      this.laporanRepository.countNasabah({
+        deletedAt: null,
+        createdAt: { lte: prevRange.end },
+      }),
     ]);
 
     const totalSimpananMasuk = this.toNumber(simpananAgg._sum.nominal);
@@ -478,39 +760,143 @@ export class LaporanService {
       totalPinjamanAktifAgg._sum.sisaPinjaman,
     );
     const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
+    const totalTransaksi = totalTransaksiAgg._count._all;
 
     const pemasukan = totalSimpananMasuk + totalAngsuranDiterima;
     const pengeluaran = totalPenarikan + totalPencairan;
     const saldoAkhir = saldoAwal + pemasukan - pengeluaran;
+    const netCashflow = pemasukan - pengeluaran;
 
-    const kpi = this.calculateKpi({
-      saldoAkhir,
-      totalPenarikan,
+    const prevTotalSimpananMasuk = this.toNumber(prevSimpananAgg._sum.nominal);
+    const prevTotalPinjaman = this.toNumber(
+      prevPinjamanAgg._sum.jumlahPinjaman,
+    );
+    const prevTotalTransaksi = prevTransaksiAgg._count._all;
+    const growthSimpanan = this.calculateGrowth(
+      totalSimpananMasuk,
+      prevTotalSimpananMasuk,
+    );
+    const growthPinjaman = this.calculateGrowth(
+      totalPinjamanDiberikan,
+      prevTotalPinjaman,
+    );
+    const growthTransaksi = this.calculateGrowth(
+      totalTransaksi,
+      prevTotalTransaksi,
+    );
+    const growthAnggota = this.calculateGrowth(totalAnggota, prevTotalAnggota);
+
+    const rasioLikuiditas = this.safeDivide(saldoAkhir, totalPenarikan);
+    const rasioCashCoverage = this.safeDivide(
+      totalAngsuranDiterima,
+      totalPencairan,
+    );
+    const rasioPengeluaran = this.safeDivide(pengeluaran, pemasukan);
+
+    const top5Outstanding = topOutstanding.reduce((acc, item) => {
+      return acc + this.toNumber(item.sisaPinjaman);
+    }, 0);
+    const konsentrasiTop5 = this.safeDivide(
+      top5Outstanding,
       totalPinjamanAktif,
-      totalSimpanan,
-      totalAngsuran: totalAngsuranDiterima,
-      anggotaBaru,
-      anggotaKeluar,
-      totalAnggota,
-      netCashflow: pemasukan - pengeluaran,
+    );
+    const rataRataPinjaman = this.safeDivide(
+      totalPinjamanAktif,
+      totalPinjamanAktifCount,
+    );
+    const rasioKreditAktif = this.safeDivide(totalPinjamanAktif, totalSimpanan);
+
+    const rasioKeaktifan = this.safeDivide(anggotaAktif, totalAnggota);
+    const rasioPartisipasiTransaksi = this.safeDivide(
+      anggotaDenganTransaksi,
+      anggotaAktif,
+    );
+    const anggotaTanpaTransaksi = Math.max(
+      0,
+      totalAnggota - anggotaDenganTransaksi,
+    );
+    const rasioPinjamanAktif = this.safeDivide(
+      anggotaDenganPinjamanAktif,
+      anggotaAktif,
+    );
+
+    const riskAnalysis = {
+      likuiditas: this.getLikuiditasRisk(rasioLikuiditas),
+      ekspansiKredit: this.getEkspansiKreditRisk(rasioKreditAktif),
+      arusKas: this.getArusKasRisk(netCashflow),
+      konsentrasiKredit: this.getKonsentrasiKreditRisk(konsentrasiTop5),
+      aktivitasAnggota: this.getAktivitasAnggotaRisk(
+        rasioKeaktifan,
+        rasioPartisipasiTransaksi,
+      ),
+    };
+
+    const executiveInsight = this.buildExecutiveInsight({
+      growthSimpanan,
+      growthPinjaman,
+      rasioLikuiditas,
+      rasioKreditAktif,
+      netCashflow,
+    });
+
+    const healthScore = this.calculateHealthScore({
+      rasioLikuiditas,
+      rasioKreditAktif,
+      rasioPengeluaran,
+      netCashflow,
+      rasioKeaktifan,
+      rasioPartisipasiTransaksi,
+      growthValues: [
+        growthSimpanan,
+        growthPinjaman,
+        growthTransaksi,
+        growthAnggota,
+      ],
     });
 
     return {
       message: 'Berhasil mengambil laporan bulanan',
       data: {
         periode: { bulan, tahun },
-        totalSimpananMasuk,
-        totalPinjamanDiberikan,
-        totalAngsuranDiterima,
-        totalPenarikan,
-        totalPencairan,
-        saldoAwal,
-        saldoAkhir,
-        anggotaAktif,
-        totalAnggota,
-        anggotaBaru,
-        anggotaKeluar,
-        kpi,
+        summary: {
+          totalSimpananMasuk,
+          totalPinjamanDiberikan,
+          totalAngsuranDiterima,
+          totalPenarikan,
+          saldoAwal,
+          saldoAkhir,
+          anggotaAktif,
+          totalAnggota,
+          anggotaBaru,
+          anggotaKeluar,
+        },
+        performance: {
+          growthSimpanan,
+          growthPinjaman,
+          growthTransaksi,
+          growthAnggota,
+          netCashflow,
+        },
+        financialStrength: {
+          rasioLikuiditas,
+          rasioCashCoverage,
+          rasioPengeluaran,
+        },
+        portfolioQuality: {
+          totalOutstanding: totalPinjamanAktif,
+          rasioKreditAktif,
+          konsentrasiTop5,
+          rataRataPinjaman,
+        },
+        memberHealth: {
+          rasioKeaktifan,
+          rasioPartisipasiTransaksi,
+          anggotaTanpaTransaksi,
+          rasioPinjamanAktif,
+        },
+        riskAnalysis,
+        executiveInsight,
+        healthScore,
       },
     };
   }
