@@ -96,18 +96,6 @@ export class LaporanRepository {
     });
   }
 
-  maxTransaksiNominal(args: {
-    jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
-    tanggalFrom?: Date;
-    tanggalTo?: Date;
-  }) {
-    return this.prisma.transaksi.aggregate({
-      where: this.buildTransaksiWhere(args),
-      _max: { nominal: true },
-    });
-  }
-
   topNasabahByTransaksi(args: {
     jenisTransaksi: JenisTransaksi;
     statusTransaksi?: StatusTransaksi;

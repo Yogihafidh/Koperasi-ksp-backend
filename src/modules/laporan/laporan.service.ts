@@ -80,6 +80,13 @@ export class LaporanService {
     return Math.round(value * factor) / factor;
   }
 
+  private ratioOfTotal(value: number, total: number) {
+    if (total <= 0) {
+      return null;
+    }
+    return this.roundTo(value / total, 2);
+  }
+
   private shiftMonth(bulan: number, tahun: number, offset: number) {
     const date = new Date(tahun, bulan - 1, 1);
     date.setMonth(date.getMonth() + offset);
@@ -482,86 +489,24 @@ export class LaporanService {
     const totalNominal = this.toNumber(totalNominalAgg._sum.nominal);
     const daysInMonth = end.getDate();
     const rataRataPerHari = this.safeDivide(totalTransaksi, daysInMonth);
-    const rataRataNominal = this.safeDivide(totalNominal, totalTransaksi);
 
     const jenisMap = this.buildJenisMap(allJenis, () => ({
       jumlah: 0,
       total: 0,
+      rataRataNominal: null as number | null,
+      persentaseDariTotalNominal: null as number | null,
     }));
 
     for (const row of grouped) {
+      const totalJenis = this.toNumber(row._sum.nominal);
+      const jumlahJenis = row._count._all;
       jenisMap[row.jenisTransaksi] = {
-        jumlah: row._count._all,
-        total: this.toNumber(row._sum.nominal),
+        jumlah: jumlahJenis,
+        total: totalJenis,
+        rataRataNominal: this.safeDivide(totalJenis, jumlahJenis),
+        persentaseDariTotalNominal: this.ratioOfTotal(totalJenis, totalNominal),
       };
     }
-
-    const prev = this.shiftMonth(bulan, tahun, -1);
-    const prev2 = this.shiftMonth(bulan, tahun, -2);
-    const [prevCountAgg, prev2CountAgg] = await Promise.all([
-      this.laporanRepository.countTransaksi({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: this.getMonthRange(prev.bulan, prev.tahun).start,
-        tanggalTo: this.getMonthRange(prev.bulan, prev.tahun).end,
-      }),
-      this.laporanRepository.countTransaksi({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: this.getMonthRange(prev2.bulan, prev2.tahun).start,
-        tanggalTo: this.getMonthRange(prev2.bulan, prev2.tahun).end,
-      }),
-    ]);
-    const prevTotal = prevCountAgg._count._all;
-    const prev2Total = prev2CountAgg._count._all;
-    const growth = this.calculateGrowth(totalTransaksi, prevTotal);
-
-    const tren3Bulan = this.getTransaksiTrend(
-      totalTransaksi,
-      prevTotal,
-      prev2Total,
-    );
-
-    const [totalSetoranAgg, totalPencairanAgg] = await Promise.all([
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.SETORAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.PENCAIRAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-    ]);
-    const totalSetoran = this.toNumber(totalSetoranAgg._sum.nominal);
-    const totalPencairan = this.toNumber(totalPencairanAgg._sum.nominal);
-    const rasioKreditTerhadapSetoran = this.safeDivide(
-      totalPencairan,
-      totalSetoran,
-    );
-
-    const totalNasabahTransaksi =
-      await this.laporanRepository.countDistinctNasabahTransaksi({
-        jenisTransaksi: allJenis,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      });
-    const topCount = Math.max(1, Math.ceil(totalNasabahTransaksi * 0.1));
-    const topNasabah = await this.laporanRepository.topNasabahByNominal({
-      jenisTransaksi: allJenis,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-      take: topCount,
-    });
-    const topNominal = topNasabah.reduce((acc, row) => {
-      return acc + this.toNumber(row._sum.nominal);
-    }, 0);
-    const konsentrasiTop10Anggota = this.safeDivide(topNominal, totalNominal);
-
-    const lonjakanTransaksiTidakWajar = growth !== null && growth > 0.5;
 
     return {
       message: 'Berhasil mengambil laporan transaksi',
@@ -571,18 +516,8 @@ export class LaporanService {
           totalTransaksi,
           totalNominal,
           rataRataPerHari,
-          rataRataNominal,
         },
         breakdown: jenisMap,
-        growth: {
-          dibandingBulanLalu: growth,
-          tren3Bulan,
-        },
-        riskIndicators: {
-          rasioKreditTerhadapSetoran,
-          konsentrasiTop10Anggota,
-          lonjakanTransaksiTidakWajar,
-        },
       },
     };
   }
