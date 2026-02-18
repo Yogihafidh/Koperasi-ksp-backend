@@ -61,19 +61,6 @@ export class LaporanService {
     return (current - previous) / previous;
   }
 
-  private formatGrowthText(growth: number | null) {
-    if (growth === null) {
-      return 'Belum ada data pembanding bulan lalu';
-    }
-    if (growth === 0) {
-      return 'Stabil dibanding bulan lalu';
-    }
-    const percent = Math.abs(Math.round(growth * 100));
-    if (growth > 0) {
-      return `Mengalami kenaikan ${percent}% dari bulan lalu`;
-    }
-    return `Mengalami penurunan ${percent}% dari bulan lalu`;
-  }
 
   private roundTo(value: number, decimals: number) {
     const factor = 10 ** decimals;
@@ -577,24 +564,6 @@ export class LaporanService {
       jumlahPeminjam,
     );
 
-    let kpiStatus = 'SEHAT';
-    if ((rasioPembayaranLancar ?? 0) < 0.04) {
-      kpiStatus = 'RISIKO';
-    } else if ((rasioPembayaranLancar ?? 0) < 0.08) {
-      kpiStatus = 'WASPADA';
-    }
-
-    const interpretasiKredit =
-      coverageTerhadapPencairan !== null && coverageTerhadapPencairan >= 1
-        ? 'Pembayaran stabil dan mampu menutup pencairan bulan ini'
-        : 'Pencairan lebih besar dari angsuran, perlu monitoring';
-    let risikoKredit = 'Rendah';
-    if (kpiStatus === 'WASPADA') {
-      risikoKredit = 'Sedang';
-    } else if (kpiStatus === 'RISIKO') {
-      risikoKredit = 'Tinggi';
-    }
-
     return {
       message: 'Berhasil mengambil laporan angsuran',
       data: {
@@ -609,11 +578,6 @@ export class LaporanService {
           coverageTerhadapPencairan,
           rataRataPerPeminjam,
         },
-        insight: {
-          interpretasiKredit,
-          risikoKredit,
-        },
-        kpiStatus,
       },
     };
   }
@@ -660,27 +624,15 @@ export class LaporanService {
       tanggalTo: prevEnd,
     });
     const prevTotal = this.toNumber(prevAgg._sum.nominal);
-    const growthDariBulanLalu = this.calculateGrowth(totalPenarikan, prevTotal);
+    const pertumbuhanDariBulanLalu = this.calculateGrowth(
+      totalPenarikan,
+      prevTotal,
+    );
 
     const top3Total = topNasabahNominal.reduce((acc, row) => {
       return acc + this.toNumber(row._sum.nominal);
     }, 0);
     const konsentrasiTop3 = this.safeDivide(top3Total, totalPenarikan);
-
-    let kpiStatus = 'AMAN';
-    const ratioValue = rasioTerhadapSimpanan ?? 0;
-    if (ratioValue >= 0.4) {
-      kpiStatus = 'RISIKO';
-    } else if (ratioValue >= 0.2) {
-      kpiStatus = 'WASPADA';
-    }
-
-    let interpretasiLikuiditas = 'Penarikan masih dalam batas aman';
-    if (kpiStatus === 'WASPADA') {
-      interpretasiLikuiditas = 'Tekanan likuiditas mulai meningkat';
-    } else if (kpiStatus === 'RISIKO') {
-      interpretasiLikuiditas = 'Penarikan terlalu tinggi dan berisiko';
-    }
 
     return {
       message: 'Berhasil mengambil laporan penarikan',
@@ -693,14 +645,9 @@ export class LaporanService {
         },
         metrics: {
           rasioTerhadapSimpanan,
-          growthDariBulanLalu,
+          pertumbuhanDariBulanLalu,
           konsentrasiTop3,
         },
-        insight: {
-          interpretasiLikuiditas,
-          tren: this.formatGrowthText(growthDariBulanLalu),
-        },
-        kpiStatus,
       },
     };
   }
@@ -736,28 +683,6 @@ export class LaporanService {
       totalPinjamanAktif,
     );
 
-    let kpiStatus = 'STABIL';
-    const ratioValue = rasioPinjamanTerhadapSimpanan ?? 0;
-    if (ratioValue > 0.85) {
-      kpiStatus = 'RISIKO';
-    } else if (ratioValue >= 0.7) {
-      kpiStatus = 'WASPADA';
-    }
-
-    let ekspansiKredit = 'Masih dalam batas sehat';
-    if (kpiStatus === 'WASPADA') {
-      ekspansiKredit = 'Mulai mendekati batas aman';
-    } else if (kpiStatus === 'RISIKO') {
-      ekspansiKredit = 'Ekspansi terlalu agresif';
-    }
-    let risikoKonsentrasi = 'Rendah';
-    const konsentrasiValue = konsentrasiTop5 ?? 0;
-    if (konsentrasiValue > 0.6) {
-      risikoKonsentrasi = 'Tinggi';
-    } else if (konsentrasiValue >= 0.4) {
-      risikoKonsentrasi = 'Sedang';
-    }
-
     return {
       message: 'Berhasil mengambil laporan pinjaman',
       data: {
@@ -772,11 +697,6 @@ export class LaporanService {
           konsentrasiTop5,
           rataRataOutstanding,
         },
-        insight: {
-          ekspansiKredit,
-          risikoKonsentrasi,
-        },
-        kpiStatus,
       },
     };
   }
@@ -824,33 +744,6 @@ export class LaporanService {
     );
     const rataRataSaldoAnggota = this.safeDivide(totalSimpanan, anggotaAktif);
 
-    let pertumbuhanDana = 'Belum ada data pembanding bulan lalu';
-    if (growthSimpanan !== null) {
-      if (growthSimpanan > 0) {
-        pertumbuhanDana = `Simpanan tumbuh ${Math.round(growthSimpanan * 100)}% dari bulan lalu`;
-      } else if (growthSimpanan < 0) {
-        pertumbuhanDana = `Simpanan turun ${Math.round(Math.abs(growthSimpanan) * 100)}% dari bulan lalu`;
-      } else {
-        pertumbuhanDana = 'Simpanan stabil dibanding bulan lalu';
-      }
-    }
-    let kepercayaanAnggota = 'Cukup baik';
-    const sukarelaValue = rasioSukarela ?? 0;
-    if (sukarelaValue >= 0.2) {
-      kepercayaanAnggota = 'Baik';
-    } else if (sukarelaValue < 0.1) {
-      kepercayaanAnggota = 'Rendah';
-    }
-
-    let kpiStatus = 'BERTUMBUH';
-    if (growthSimpanan === null) {
-      kpiStatus = 'N/A';
-    } else if (growthSimpanan < 0) {
-      kpiStatus = 'MENURUN';
-    } else if (growthSimpanan === 0) {
-      kpiStatus = 'STAGNAN';
-    }
-
     return {
       message: 'Berhasil mengambil laporan simpanan',
       data: {
@@ -866,49 +759,35 @@ export class LaporanService {
           rasioSukarela,
           rataRataSaldoAnggota,
         },
-        insight: {
-          pertumbuhanDana,
-          kepercayaanAnggota,
-        },
-        kpiStatus,
       },
     };
   }
 
   async getLaporanCashflow(bulan: number, tahun: number) {
     const { start, end } = this.getMonthRange(bulan, tahun);
-    const [pemasukanAgg, pengeluaranAgg, saldoAwal, angsuranAgg] =
-      await Promise.all([
-        this.laporanRepository.sumTransaksiNominal({
-          jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-          statusTransaksi: StatusTransaksi.APPROVED,
-          tanggalFrom: start,
-          tanggalTo: end,
-        }),
-        this.laporanRepository.sumTransaksiNominal({
-          jenisTransaksi: [JenisTransaksi.PENARIKAN, JenisTransaksi.PENCAIRAN],
-          statusTransaksi: StatusTransaksi.APPROVED,
-          tanggalFrom: start,
-          tanggalTo: end,
-        }),
-        this.getSaldoAwal(bulan, tahun),
-        this.laporanRepository.sumTransaksiNominal({
-          jenisTransaksi: JenisTransaksi.ANGSURAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
-          tanggalFrom: start,
-          tanggalTo: end,
-        }),
-      ]);
+    const [pemasukanAgg, pengeluaranAgg, saldoAwal] = await Promise.all([
+      this.laporanRepository.sumTransaksiNominal({
+        jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: start,
+        tanggalTo: end,
+      }),
+      this.laporanRepository.sumTransaksiNominal({
+        jenisTransaksi: [JenisTransaksi.PENARIKAN, JenisTransaksi.PENCAIRAN],
+        statusTransaksi: StatusTransaksi.APPROVED,
+        tanggalFrom: start,
+        tanggalTo: end,
+      }),
+      this.getSaldoAwal(bulan, tahun),
+    ]);
 
     const pemasukan = this.toNumber(pemasukanAgg._sum.nominal);
     const pengeluaran = this.toNumber(pengeluaranAgg._sum.nominal);
     const surplus = pemasukan - pengeluaran;
     const saldoAkhir = saldoAwal + surplus;
-    const totalAngsuran = this.toNumber(angsuranAgg._sum.nominal);
 
     const rasioLikuiditas = this.safeDivide(saldoAwal + pemasukan, pengeluaran);
     const rasioPengeluaran = this.safeDivide(pengeluaran, pemasukan);
-    const dependencyOnAngsuran = this.safeDivide(totalAngsuran, pemasukan);
 
     const prev = this.shiftMonth(bulan, tahun, -1);
     const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
@@ -929,7 +808,7 @@ export class LaporanService {
     const prevSurplus =
       this.toNumber(prevPemasukanAgg._sum.nominal) -
       this.toNumber(prevPengeluaranAgg._sum.nominal);
-    const cashflowGrowth = this.calculateGrowth(surplus, prevSurplus);
+    const surplusDelta = surplus - prevSurplus;
 
     const monthRanges = Array.from({ length: 3 }, (_, index) => {
       const shifted = this.shiftMonth(bulan, tahun, -index);
@@ -961,16 +840,6 @@ export class LaporanService {
         };
       }),
     );
-    const pengeluaran3Bulan = cashflowAggs.map((item) => item.pengeluaran);
-    const rataRataPengeluaranBulanan = this.safeDivide(
-      pengeluaran3Bulan.reduce((acc, val) => acc + val, 0),
-      pengeluaran3Bulan.length,
-    );
-    const cashCoverageMonth =
-      rataRataPengeluaranBulanan === null
-        ? null
-        : this.safeDivide(saldoAkhir, rataRataPengeluaranBulanan);
-
     let defisitBeruntun = 0;
     for (const cashflow of cashflowAggs) {
       const monthlySurplus = cashflow.pemasukan - cashflow.pengeluaran;
@@ -980,11 +849,6 @@ export class LaporanService {
         break;
       }
     }
-
-    const earlyWarning = {
-      likuiditasRendah: (rasioLikuiditas ?? 0) < 1,
-      defisitBerulang: defisitBeruntun >= 2,
-    };
 
     return {
       message: 'Berhasil mengambil laporan cashflow',
@@ -1000,14 +864,11 @@ export class LaporanService {
         rasio: {
           rasioLikuiditas,
           rasioPengeluaran,
-          cashCoverageMonth,
-          dependencyOnAngsuran,
         },
         tren: {
-          cashflowGrowth,
+          surplusDelta,
           defisitBeruntun,
         },
-        earlyWarning,
       },
     };
   }
@@ -1023,10 +884,8 @@ export class LaporanService {
       anggotaDenganPinjamanAktif,
       nasabahList,
       lastTransaksi,
-      totalSimpananAgg,
       totalPinjamanAktifAgg,
       anggotaDenganTransaksi,
-      topSimpananNasabah,
     ] = await Promise.all([
       this.laporanRepository.countNasabah({ deletedAt: null }),
       this.laporanRepository.countNasabah({
@@ -1045,7 +904,6 @@ export class LaporanService {
       this.laporanRepository.countNasabahWithPinjamanAktif(),
       this.laporanRepository.listNasabahBasic(),
       this.laporanRepository.groupLastTransaksiPerNasabah(),
-      this.laporanRepository.sumSaldoSimpanan(),
       this.laporanRepository.sumPinjamanAktifNominal(),
       this.laporanRepository.countDistinctNasabahTransaksi({
         jenisTransaksi: Object.values(JenisTransaksi) as JenisTransaksi[],
@@ -1053,7 +911,6 @@ export class LaporanService {
         tanggalFrom: start,
         tanggalTo: end,
       }),
-      this.laporanRepository.topNasabahBySaldoSimpanan(5),
     ]);
 
     const lastTransaksiMap = new Map<number, Date | null>();
@@ -1062,9 +919,7 @@ export class LaporanService {
     }
 
     const thresholdTidakAktif = this.subtractMonths(end, 3);
-    const thresholdTanpaTransaksi = this.subtractMonths(end, 2);
     let tidakAktifLebih3Bulan = 0;
-    let tanpaTransaksiLebih2Bulan = 0;
 
     for (const nasabah of nasabahList) {
       if (nasabah.status !== NasabahStatus.AKTIF) {
@@ -1075,12 +930,7 @@ export class LaporanService {
       if (!lastDate || lastDate <= thresholdTidakAktif) {
         tidakAktifLebih3Bulan += 1;
       }
-      if (!lastDate || lastDate <= thresholdTanpaTransaksi) {
-        tanpaTransaksiLebih2Bulan += 1;
-      }
     }
-
-    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
     const totalPinjamanAktif = this.toNumber(
       totalPinjamanAktifAgg._sum.sisaPinjaman,
     );
@@ -1101,17 +951,6 @@ export class LaporanService {
       anggotaDenganPinjamanAktif,
       anggotaAktif,
     );
-    const topSimpananTotal = topSimpananNasabah.reduce((acc, row) => {
-      return acc + this.toNumber(row._sum.saldoBerjalan);
-    }, 0);
-    const konsentrasiSimpananTop5 = this.safeDivide(
-      topSimpananTotal,
-      totalSimpanan,
-    );
-    const anggotaDormantRisk = this.safeDivide(
-      tidakAktifLebih3Bulan,
-      anggotaAktif,
-    );
 
     return {
       message: 'Berhasil mengambil laporan anggota',
@@ -1123,11 +962,6 @@ export class LaporanService {
           anggotaBaru,
           anggotaKeluar,
         },
-        aktivitas: {
-          anggotaDenganTransaksi,
-          tanpaTransaksiLebih2Bulan,
-          tidakAktifLebih3Bulan,
-        },
         kredit: {
           anggotaDenganPinjamanAktif,
           rataRataPinjamanPerAnggota,
@@ -1137,10 +971,6 @@ export class LaporanService {
           rasioPertumbuhan,
           rasioPartisipasiTransaksi,
           rasioPinjamanAktif,
-        },
-        riskIndicators: {
-          konsentrasiSimpananTop5,
-          anggotaDormantRisk,
         },
       },
     };
