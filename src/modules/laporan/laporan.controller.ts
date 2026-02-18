@@ -172,12 +172,6 @@ export class LaporanController {
               coverageTerhadapPencairan: 1.4,
               rataRataPerPeminjam: 437500,
             },
-            insight: {
-              interpretasiKredit:
-                'Pembayaran stabil dan mampu menutup pencairan bulan ini',
-              risikoKredit: 'Rendah',
-            },
-            kpiStatus: 'SEHAT',
           },
         },
       },
@@ -211,14 +205,9 @@ export class LaporanController {
             },
             metrics: {
               rasioTerhadapSimpanan: 0.18,
-              growthDariBulanLalu: 0.12,
+              pertumbuhanDariBulanLalu: 0.12,
               konsentrasiTop3: 0.46,
             },
-            insight: {
-              interpretasiLikuiditas: 'Penarikan masih dalam batas aman',
-              tren: 'Mengalami kenaikan 12% dari bulan lalu',
-            },
-            kpiStatus: 'AMAN',
           },
         },
       },
@@ -255,11 +244,6 @@ export class LaporanController {
               konsentrasiTop5: 0.55,
               rataRataOutstanding: 2500000,
             },
-            insight: {
-              ekspansiKredit: 'Masih dalam batas sehat',
-              risikoKonsentrasi: 'Sedang',
-            },
-            kpiStatus: 'STABIL',
           },
         },
       },
@@ -297,11 +281,6 @@ export class LaporanController {
               rasioSukarela: 0.17,
               rataRataSaldoAnggota: 850000,
             },
-            insight: {
-              pertumbuhanDana: 'Simpanan tumbuh 8% dari bulan lalu',
-              kepercayaanAnggota: 'Cukup baik',
-            },
-            kpiStatus: 'BERTUMBUH',
           },
         },
       },
@@ -338,16 +317,10 @@ export class LaporanController {
             rasio: {
               rasioLikuiditas: 1.2,
               rasioPengeluaran: 1.45,
-              cashCoverageMonth: 1.1,
-              dependencyOnAngsuran: 0.22,
             },
             tren: {
-              cashflowGrowth: -0.15,
+              surplusDelta: -1000000,
               defisitBeruntun: 2,
-            },
-            earlyWarning: {
-              likuiditasRendah: false,
-              defisitBerulang: true,
             },
           },
         },
@@ -381,11 +354,6 @@ export class LaporanController {
               anggotaBaru: 5,
               anggotaKeluar: 2,
             },
-            aktivitas: {
-              anggotaDenganTransaksi: 105,
-              tanpaTransaksiLebih2Bulan: 15,
-              tidakAktifLebih3Bulan: 10,
-            },
             kredit: {
               anggotaDenganPinjamanAktif: 8,
               rataRataPinjamanPerAnggota: 2500000,
@@ -395,10 +363,6 @@ export class LaporanController {
               rasioPertumbuhan: 0.02,
               rasioPartisipasiTransaksi: 0.7,
               rasioPinjamanAktif: 0.06,
-            },
-            riskIndicators: {
-              konsentrasiSimpananTop5: 0.42,
-              anggotaDormantRisk: 0.1,
             },
           },
         },
