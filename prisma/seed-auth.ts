@@ -61,6 +61,9 @@ async function seed() {
       { code: 'laporan.read', description: 'Read laporan' },
       { code: 'laporan.generate', description: 'Generate laporan' },
       { code: 'laporan.finalize', description: 'Finalize laporan' },
+
+      // Dashboard permissions
+      { code: 'dashboard.read', description: 'Read dashboard' },
     ];
 
     for (const permission of permissions) {
@@ -138,6 +141,7 @@ async function seed() {
       'pinjaman.angsuran',
       'transaksi.create',
       'transaksi.read',
+      'dashboard.read',
     ];
     const kasirPermissions = await prisma.permission.findMany({
       where: { code: { in: kasirPermissionCodes } },
@@ -192,6 +196,7 @@ async function seed() {
       'laporan.read',
       'laporan.generate',
       'laporan.finalize',
+      'dashboard.read',
     ];
     const pimpinanPermissions = await prisma.permission.findMany({
       where: { code: { in: pimpinanPermissionCodes } },
