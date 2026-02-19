@@ -13,4 +13,11 @@ export default registerAs('app', () => ({
     600,
   cacheTtlLaporanSeconds:
     Number.parseInt(process.env.CACHE_TTL_LAPORAN_SECONDS || '900', 10) || 900,
+  snapshotDaysBeforeMonthEnd:
+    Number.parseInt(
+      process.env.SNAPSHOT_DAYS_BEFORE_MONTH_END || '3',
+      10,
+    ) || 3,
+  snapshotSystemUserId:
+    Number.parseInt(process.env.SNAPSHOT_SYSTEM_USER_ID || '1', 10) || 1,
 }));

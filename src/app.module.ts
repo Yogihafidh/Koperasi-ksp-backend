@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { PegawaiModule } from './modules/pegawai/pegawai.module';
@@ -23,6 +24,7 @@ import databaseConfig from './config/database.config';
       envFilePath: '.env', // Lokasi file .env
       load: [appConfig, jwtConfig, databaseConfig], // Load semua config files
     }),
+    ScheduleModule.forRoot(),
     AppCacheModule,
     AuthModule,
     PegawaiModule,
