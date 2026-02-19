@@ -29,6 +29,31 @@ export class SettingsController {
   @ApiResponse({
     status: 200,
     description: 'Daftar settings berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil daftar settings',
+          data: [
+            {
+              id: 1,
+              key: 'loan.maxTenorMonths',
+              value: '24',
+              valueType: 'NUMBER',
+              description: 'Batas maksimum tenor pinjaman (bulan)',
+              updatedAt: '2026-02-19T10:00:00.000Z',
+            },
+            {
+              id: 2,
+              key: 'savings.allowWithdrawalIfLoanActive',
+              value: 'false',
+              valueType: 'BOOLEAN',
+              description: 'Izin tarik simpanan saat pinjaman masih aktif',
+              updatedAt: '2026-02-19T10:00:00.000Z',
+            },
+          ],
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   listSettings() {
@@ -43,6 +68,21 @@ export class SettingsController {
   @ApiResponse({
     status: 200,
     description: 'Detail setting berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil detail setting',
+          data: {
+            id: 1,
+            key: 'loan.maxTenorMonths',
+            value: '24',
+            valueType: 'NUMBER',
+            description: 'Batas maksimum tenor pinjaman (bulan)',
+            updatedAt: '2026-02-19T10:00:00.000Z',
+          },
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   getSetting(@Param('key') key: string) {
