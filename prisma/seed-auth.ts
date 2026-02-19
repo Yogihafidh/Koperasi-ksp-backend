@@ -1,5 +1,5 @@
 // Auth Module Seeder
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, SettingValueType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -79,7 +79,12 @@ async function seed() {
     }
     console.log(`Created ${permissions.length} permissions`);
 
-    const defaultSettings = [
+    const defaultSettings: Array<{
+      key: string;
+      value: string;
+      valueType: SettingValueType;
+      description: string;
+    }> = [
       {
         key: 'loan.maxTenorMonths',
         value: '24',
