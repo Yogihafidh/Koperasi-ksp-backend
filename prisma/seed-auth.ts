@@ -64,6 +64,10 @@ async function seed() {
 
       // Dashboard permissions
       { code: 'dashboard.read', description: 'Read dashboard' },
+
+      // Settings permissions
+      { code: 'settings.read', description: 'Read settings' },
+      { code: 'settings.update', description: 'Update settings' },
     ];
 
     for (const permission of permissions) {
@@ -74,6 +78,82 @@ async function seed() {
       });
     }
     console.log(`Created ${permissions.length} permissions`);
+
+    const defaultSettings = [
+      {
+        key: 'loan.maxTenorMonths',
+        value: '24',
+        valueType: 'NUMBER',
+        description: 'Batas maksimum tenor pinjaman (bulan)',
+      },
+      {
+        key: 'loan.minTenorMonths',
+        value: '3',
+        valueType: 'NUMBER',
+        description: 'Batas minimum tenor pinjaman (bulan)',
+      },
+      {
+        key: 'loan.maxLoanAmount',
+        value: '50000000',
+        valueType: 'NUMBER',
+        description: 'Batas maksimum nominal pinjaman per pengajuan',
+      },
+      {
+        key: 'loan.defaultInterestPercent',
+        value: '2.5',
+        valueType: 'NUMBER',
+        description: 'Bunga pinjaman default dalam persen',
+      },
+      {
+        key: 'loan.autoApprovalLimit',
+        value: '3000000',
+        valueType: 'NUMBER',
+        description: 'Batas nominal pinjaman untuk auto approval',
+      },
+      {
+        key: 'savings.minInitialDeposit',
+        value: '50000',
+        valueType: 'NUMBER',
+        description: 'Setoran awal minimum saat membuka simpanan',
+      },
+      {
+        key: 'savings.minMonthlyDeposit',
+        value: '25000',
+        valueType: 'NUMBER',
+        description: 'Setoran bulanan minimum simpanan wajib',
+      },
+      {
+        key: 'savings.allowWithdrawalIfLoanActive',
+        value: 'false',
+        valueType: 'BOOLEAN',
+        description: 'Izin tarik simpanan saat pinjaman masih aktif',
+      },
+      {
+        key: 'transaction.maxDailyNominal',
+        value: '100000000',
+        valueType: 'NUMBER',
+        description: 'Batas total nominal transaksi harian per anggota',
+      },
+      {
+        key: 'dashboard.trendMonths',
+        value: '6',
+        valueType: 'NUMBER',
+        description: 'Jumlah bulan yang ditampilkan pada tren dashboard',
+      },
+    ];
+
+    for (const item of defaultSettings) {
+      await prisma.setting.upsert({
+        where: { key: item.key },
+        update: {
+          value: item.value,
+          valueType: item.valueType,
+          description: item.description,
+        },
+        create: item,
+      });
+    }
+    console.log(`Created ${defaultSettings.length} default settings`);
 
     // Create Roles
     console.log('2. Creating roles...');
