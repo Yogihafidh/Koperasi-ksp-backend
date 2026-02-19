@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { AuditAction, PrismaClient } from '@prisma/client';
 import { AuthRepository } from './auth.repository';
+import { CacheService } from '../../common/cache/cache.service';
 import {
   RegisterDto,
   LoginDto,
@@ -26,15 +27,18 @@ import { AuditTrailService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
-  private readonly tokenBlacklist = new Map<string, number>();
-
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditTrailService: AuditTrailService,
+    private readonly cacheService: CacheService,
     private readonly prisma: PrismaClient,
   ) {}
+
+  private getBlacklistKey(token: string) {
+    return `auth:blacklist:${token}`;
+  }
 
   // ==================== AUTHENTICATION ====================
   async register(registerDto: RegisterDto) {
@@ -350,7 +354,7 @@ export class AuthService {
     };
   }
 
-  logout(accessToken: string, ipAddress?: string) {
+  async logout(accessToken: string, ipAddress?: string) {
     if (!accessToken) {
       throw new UnauthorizedException(
         'Token tidak valid atau sudah kedaluwarsa',
@@ -376,7 +380,15 @@ export class AuthService {
       );
     }
 
-    this.tokenBlacklist.set(accessToken, expiresAtMs);
+    const ttlSeconds = Math.max(
+      1,
+      Math.floor((expiresAtMs - Date.now()) / 1000),
+    );
+    await this.cacheService.setString(
+      this.getBlacklistKey(accessToken),
+      '1',
+      ttlSeconds,
+    );
 
     if (tokenPayload?.sub) {
       void this.auditTrailService.log({
@@ -393,18 +405,11 @@ export class AuthService {
     };
   }
 
-  isTokenBlacklisted(accessToken: string) {
-    const expiresAt = this.tokenBlacklist.get(accessToken);
-    if (!expiresAt) {
-      return false;
-    }
-
-    if (expiresAt <= Date.now()) {
-      this.tokenBlacklist.delete(accessToken);
-      return false;
-    }
-
-    return true;
+  async isTokenBlacklisted(accessToken: string) {
+    const cached = await this.cacheService.getString(
+      this.getBlacklistKey(accessToken),
+    );
+    return Boolean(cached);
   }
 
   // ==================== ROLE MANAGEMENT ====================

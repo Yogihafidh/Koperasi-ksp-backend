@@ -4,6 +4,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { CacheService } from '../../common/cache/cache.service';
 import { UpsertSettingDto } from './dto';
 import { SettingsRepository } from './settings.repository';
 import {
@@ -22,12 +23,15 @@ type SettingEntity = {
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
-  private readonly cache = new Map<string, SettingEntity>();
+  private readonly cacheKeyAll = 'settings:all';
 
-  constructor(private readonly settingsRepository: SettingsRepository) {}
+  constructor(
+    private readonly settingsRepository: SettingsRepository,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async onModuleInit() {
-    await this.reloadCache();
+    await this.warmCache();
   }
 
   private validateByType(value: string, valueType: SettingValueType) {
@@ -58,32 +62,46 @@ export class SettingsService implements OnModuleInit {
     }
   }
 
-  async reloadCache() {
+  private async loadSettingsFromDb(): Promise<SettingEntity[]> {
     const settings = (await this.settingsRepository.listSettings()) as Array<
       Record<string, unknown>
     >;
-    this.cache.clear();
-    for (const item of settings) {
-      const normalized: SettingEntity = {
-        id: Number(item.id),
-        key: String(item.key),
-        value: String(item.value),
-        valueType:
-          (item.valueType as SettingValueType | undefined) ??
-          SETTING_VALUE_TYPE.STRING,
-        description:
-          typeof item.description === 'string' ? item.description : null,
-        updatedAt: new Date(item.updatedAt as Date | string),
-      };
-      this.cache.set(normalized.key, normalized);
+    return settings.map((item) => ({
+      id: Number(item.id),
+      key: String(item.key),
+      value: String(item.value),
+      valueType:
+        (item.valueType as SettingValueType | undefined) ??
+        SETTING_VALUE_TYPE.STRING,
+      description: typeof item.description === 'string' ? item.description : null,
+      updatedAt: new Date(item.updatedAt as Date | string),
+    }));
+  }
+
+  private async warmCache() {
+    try {
+      const settings = await this.loadSettingsFromDb();
+      await this.cacheService.setJson(this.cacheKeyAll, settings);
+    } catch {
+      // Ignore cache warmup failures to avoid blocking app startup.
     }
   }
 
-  async listSettings() {
-    if (this.cache.size === 0) {
-      await this.reloadCache();
+  private async getSettingsCached() {
+    const cached = await this.cacheService.getJson<SettingEntity[]>(
+      this.cacheKeyAll,
+    );
+    if (cached && cached.length > 0) {
+      return cached;
     }
-    const data = Array.from(this.cache.values()).sort((a, b) =>
+
+    const settings = await this.loadSettingsFromDb();
+    await this.cacheService.setJson(this.cacheKeyAll, settings);
+    return settings;
+  }
+
+  async listSettings() {
+    const data = (await this.getSettingsCached()).sort((a, b) =>
       a.key.localeCompare(b.key),
     );
 
@@ -94,11 +112,9 @@ export class SettingsService implements OnModuleInit {
   }
 
   async getSetting(key: string) {
-    if (!this.cache.has(key)) {
-      await this.reloadCache();
-    }
-
-    const setting = this.cache.get(key);
+    const setting = (await this.getSettingsCached()).find(
+      (item) => item.key === key,
+    );
     if (!setting) {
       throw new NotFoundException(`Setting ${key} tidak ditemukan`);
     }
@@ -119,7 +135,7 @@ export class SettingsService implements OnModuleInit {
       description: dto.description,
     });
 
-    await this.reloadCache();
+    await this.cacheService.del(this.cacheKeyAll);
     return {
       message: 'Setting berhasil disimpan',
       data: updated,
@@ -158,11 +174,9 @@ export class SettingsService implements OnModuleInit {
   }
 
   private async getSettingEntity(key: string) {
-    if (!this.cache.has(key)) {
-      await this.reloadCache();
-    }
-
-    const setting = this.cache.get(key);
+    const setting = (await this.getSettingsCached()).find(
+      (item) => item.key === key,
+    );
     if (!setting) {
       throw new NotFoundException(`Setting ${key} tidak ditemukan`);
     }

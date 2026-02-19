@@ -22,9 +22,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(req: Request, payload: JwtPayload): UserFromJwt {
+  async validate(req: Request, payload: JwtPayload): Promise<UserFromJwt> {
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || '';
-    if (token && this.authService.isTokenBlacklisted(token)) {
+    if (token && (await this.authService.isTokenBlacklisted(token))) {
       throw new UnauthorizedException(
         'Token tidak valid atau sudah kedaluwarsa',
       );

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   JenisSimpanan,
   JenisTransaksi,
@@ -9,12 +10,15 @@ import {
 import { DashboardRepository } from './dashboard.repository';
 import { SettingsService } from '../settings/settings.service';
 import { SETTING_KEYS } from '../settings/constants/settings.constants';
+import { CacheService } from '../../common/cache/cache.service';
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly dashboardRepository: DashboardRepository,
     private readonly settingsService: SettingsService,
+    private readonly cacheService: CacheService,
+    private readonly configService: ConfigService,
   ) {}
 
   private toNumber(value: Prisma.Decimal | number | null | undefined) {
@@ -61,7 +65,24 @@ export class DashboardService {
     return `${monthNames[bulan - 1]} ${tahun}`;
   }
 
+  private getCacheKey(bulan: number, tahun: number) {
+    return `dashboard:${tahun}:${bulan}`;
+  }
+
+  private getCacheTtlSeconds() {
+    return (
+      this.configService.get<number>('app.cacheTtlDashboardSeconds') ?? 600
+    );
+  }
+
   async getDashboard(bulan: number, tahun: number) {
+    const cached = await this.cacheService.getJson<Record<string, unknown>>(
+      this.getCacheKey(bulan, tahun),
+    );
+    if (cached) {
+      return cached;
+    }
+
     const trendMonthsSetting = await this.settingsService.getNumber(
       SETTING_KEYS.DASHBOARD_TREND_MONTHS,
     );
@@ -208,7 +229,7 @@ export class DashboardService {
       nominal: this.toNumber(item.sisaPinjaman),
     }));
 
-    return {
+    const response = {
       message: 'Berhasil mengambil data dashboard',
       data: {
         periode: { bulan, tahun },
@@ -233,5 +254,13 @@ export class DashboardService {
         },
       },
     };
+
+    await this.cacheService.setJson(
+      this.getCacheKey(bulan, tahun),
+      response,
+      this.getCacheTtlSeconds(),
+    );
+
+    return response;
   }
 }

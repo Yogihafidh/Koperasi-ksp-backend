@@ -10,6 +10,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { LaporanModule } from './modules/laporan/laporan.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { AppCacheModule } from './common/cache/cache.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -22,6 +23,7 @@ import databaseConfig from './config/database.config';
       envFilePath: '.env', // Lokasi file .env
       load: [appConfig, jwtConfig, databaseConfig], // Load semua config files
     }),
+    AppCacheModule,
     AuthModule,
     PegawaiModule,
     NasabahModule,
