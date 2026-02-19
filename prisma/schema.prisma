@@ -195,8 +195,16 @@ model Setting {
   id          Int      @id @default(autoincrement())
   key         String   @unique
   value       String
+  valueType   SettingValueType @default(STRING)
   description String?
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+enum SettingValueType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
 }
 
 enum NasabahStatus {
