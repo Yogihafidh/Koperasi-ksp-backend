@@ -136,13 +136,12 @@ export class TransaksiService {
       999,
     );
 
-    const dailyAgg = await this.transaksiRepository.sumNominalByNasabahPerTanggal(
-      {
+    const dailyAgg =
+      await this.transaksiRepository.sumNominalByNasabahPerTanggal({
         nasabahId: dto.nasabahId,
         tanggalFrom,
         tanggalTo,
-      },
-    );
+      });
     const totalToday = Number(dailyAgg._sum.nominal ?? 0);
     if (totalToday + dto.nominal > maxDailyNominal) {
       throw new BadRequestException(
@@ -207,7 +206,9 @@ export class TransaksiService {
             ? saldoBerjalan.plus(nominal)
             : (() => {
                 if (saldoBerjalan.lessThan(nominal)) {
-                  throw new BadRequestException('Saldo simpanan tidak mencukupi');
+                  throw new BadRequestException(
+                    'Saldo simpanan tidak mencukupi',
+                  );
                 }
                 return saldoBerjalan.minus(nominal);
               })();
