@@ -96,6 +96,10 @@ model Nasabah {
   pinjaman           Pinjaman[]
   rekeningSimpanan   RekeningSimpanan[]
   transaksi          Transaksi[]
+
+  @@index([status, deletedAt])
+  @@index([createdAt])
+  @@index([updatedAt])
 }
 
 model NasabahDokumen {
@@ -116,6 +120,9 @@ model RekeningSimpanan {
   deletedAt     DateTime?     @db.Timestamptz(3)
   nasabah       Nasabah       @relation(fields: [nasabahId], references: [id])
   transaksi     Transaksi[]
+
+  @@index([nasabahId, deletedAt])
+  @@index([jenisSimpanan, deletedAt])
 }
 
 model Pinjaman {
@@ -132,6 +139,11 @@ model Pinjaman {
   nasabah            Nasabah        @relation(fields: [nasabahId], references: [id])
   verifiedBy         Pegawai?       @relation("PinjamanVerifiedBy", fields: [verifiedById], references: [id])
   transaksi          Transaksi[]
+
+  @@index([nasabahId])
+  @@index([status, deletedAt])
+  @@index([status, tanggalPersetujuan])
+  @@index([status, sisaPinjaman])
 }
 
 model Transaksi {
@@ -155,9 +167,11 @@ model Transaksi {
   rekeningSimpanan   RekeningSimpanan? @relation(fields: [rekeningSimpananId], references: [id])
 
   @@index([nasabahId])
+  @@index([nasabahId, tanggal])
   @@index([rekeningSimpananId])
   @@index([pinjamanId])
   @@index([tanggal])
+  @@index([statusTransaksi, jenisTransaksi, tanggal])
 }
 
 model AuditTrail {
@@ -189,6 +203,8 @@ model LaporanKeuangan {
   generatedById  Int
   generatedAt    DateTime      @default(now()) @db.Timestamptz(3)
   generatedBy    User          @relation("LaporanGeneratedBy", fields: [generatedById], references: [id])
+
+  @@index([periodeTahun, periodeBulan])
 }
 
 model Setting {
