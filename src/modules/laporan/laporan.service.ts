@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   JenisSimpanan,
   JenisTransaksi,
@@ -8,10 +9,34 @@ import {
   StatusTransaksi,
 } from '@prisma/client';
 import { LaporanRepository } from './laporan.repository';
+import { CacheService } from '../../common/cache/cache.service';
 
 @Injectable()
 export class LaporanService {
-  constructor(private readonly laporanRepository: LaporanRepository) {}
+  constructor(
+    private readonly laporanRepository: LaporanRepository,
+    private readonly cacheService: CacheService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private getCacheKey(type: string, bulan: number, tahun: number) {
+    return `laporan:${type}:${tahun}:${bulan}`;
+  }
+
+  private getCacheTtlSeconds() {
+    return this.configService.get<number>('app.cacheTtlLaporanSeconds') ?? 900;
+  }
+
+  private async cacheResponse<T>(key: string, loader: () => Promise<T>) {
+    const cached = await this.cacheService.getJson<T>(key);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await loader();
+    await this.cacheService.setJson(key, response, this.getCacheTtlSeconds());
+    return response;
+  }
 
   private toNumber(value: Prisma.Decimal | number | null | undefined) {
     if (value === null || value === undefined) {
@@ -264,563 +289,627 @@ export class LaporanService {
   }
 
   async getLaporanBulanan(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const prev = this.shiftMonth(bulan, tahun, -1);
-    const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
+    return this.cacheResponse(
+      this.getCacheKey('bulanan', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const prev = this.shiftMonth(bulan, tahun, -1);
+        const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
 
-    const [
-      simpananAgg,
-      angsuranAgg,
-      penarikanAgg,
-      pencairanAgg,
-      pinjamanAgg,
-      totalPinjamanAktifAgg,
-      totalSimpananAgg,
-      anggotaAktif,
-      totalAnggota,
-      anggotaBaru,
-      anggotaKeluar,
-      saldoAwal,
-      totalTransaksiAgg,
-      prevSimpananAgg,
-      prevPinjamanAgg,
-      prevTransaksiAgg,
-      prevTotalAnggota,
-    ] = await Promise.all([
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.SETORAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.PENARIKAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.PENCAIRAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.aggregatePinjamanPeriode({
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumPinjamanAktifNominal(),
-      this.laporanRepository.sumSaldoSimpanan(),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        status: NasabahStatus.AKTIF,
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        createdAt: { gte: start, lte: end },
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        status: NasabahStatus.NONAKTIF,
-        updatedAt: { gte: start, lte: end },
-      }),
-      this.getSaldoAwal(bulan, tahun),
-      this.laporanRepository.countTransaksi({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: JenisTransaksi.SETORAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: prevRange.start,
-        tanggalTo: prevRange.end,
-      }),
-      this.laporanRepository.aggregatePinjamanPeriode({
-        tanggalFrom: prevRange.start,
-        tanggalTo: prevRange.end,
-      }),
-      this.laporanRepository.countTransaksi({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: prevRange.start,
-        tanggalTo: prevRange.end,
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        createdAt: { lte: prevRange.end },
-      }),
-    ]);
+        const [snapshotCurrent, snapshotPrev] = await Promise.all([
+          this.laporanRepository.findLaporanKeuanganByPeriode(bulan, tahun),
+          this.laporanRepository.findLaporanKeuanganByPeriode(
+            prev.bulan,
+            prev.tahun,
+          ),
+        ]);
 
-    const totalSimpananMasuk = this.toNumber(simpananAgg._sum.nominal);
-    const totalAngsuranDiterima = this.toNumber(angsuranAgg._sum.nominal);
-    const totalPenarikan = this.toNumber(penarikanAgg._sum.nominal);
-    const totalPencairan = this.toNumber(pencairanAgg._sum.nominal);
-    const totalPinjamanDiberikan = this.toNumber(
-      pinjamanAgg._sum.jumlahPinjaman,
-    );
-    const totalPinjamanAktif = this.toNumber(
-      totalPinjamanAktifAgg._sum.sisaPinjaman,
-    );
-    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
-    const totalTransaksi = totalTransaksiAgg._count._all;
-
-    const pemasukan = totalSimpananMasuk + totalAngsuranDiterima;
-    const pengeluaran = totalPenarikan + totalPencairan;
-    const saldoAkhir = saldoAwal + pemasukan - pengeluaran;
-    const netCashflow = pemasukan - pengeluaran;
-
-    const prevTotalSimpananMasuk = this.toNumber(prevSimpananAgg._sum.nominal);
-    const prevTotalPinjaman = this.toNumber(
-      prevPinjamanAgg._sum.jumlahPinjaman,
-    );
-    const prevTotalTransaksi = prevTransaksiAgg._count._all;
-    const growthSimpanan = this.calculateGrowth(
-      totalSimpananMasuk,
-      prevTotalSimpananMasuk,
-    );
-    const growthPinjaman = this.calculateGrowth(
-      totalPinjamanDiberikan,
-      prevTotalPinjaman,
-    );
-    const growthTransaksi = this.calculateGrowth(
-      totalTransaksi,
-      prevTotalTransaksi,
-    );
-    const growthAnggota = this.calculateGrowth(totalAnggota, prevTotalAnggota);
-
-    const rasioLikuiditas = this.safeDivide(saldoAkhir, totalPenarikan);
-    const rasioCashCoverage = this.safeDivide(
-      totalAngsuranDiterima,
-      totalPencairan,
-    );
-    const rasioKreditAktif = this.safeDivide(totalPinjamanAktif, totalSimpanan);
-
-    const rasioKeaktifan = this.safeDivide(anggotaAktif, totalAnggota);
-    const rasioKeaktifanAnggota = rasioKeaktifan;
-
-    const riskEvaluation = {
-      likuiditas: this.getLikuiditasRisk(rasioLikuiditas),
-      ekspansiKredit: this.getEkspansiKreditRisk(rasioKreditAktif),
-      arusKas: this.getArusKasRisk(netCashflow),
-      ketahananKas: this.getKetahananKasRisk(rasioCashCoverage),
-      aktivitasAnggota: this.getAktivitasAnggotaRisk(rasioKeaktifanAnggota),
-    };
-
-    return {
-      message: 'Berhasil mengambil laporan bulanan',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
-          totalSimpananMasuk,
-          totalPinjamanDiberikan,
-          totalAngsuranDiterima,
-          totalPenarikan,
-          saldoAwal,
-          saldoAkhir,
+        const [
+          transaksiGrouped,
+          prevTransaksiGrouped,
+          pinjamanAgg,
+          totalPinjamanAktifAgg,
+          totalSimpananAgg,
           anggotaAktif,
           totalAnggota,
           anggotaBaru,
           anggotaKeluar,
-        },
-        performance: {
-          growthSimpanan,
-          growthPinjaman,
-          growthTransaksi,
-          growthAnggota,
-          netCashflow,
-        },
-        financialIndicators: {
-          rasioLikuiditas,
-          rasioKreditAktif,
-          rasioCashCoverage,
-          rasioKeaktifanAnggota,
-        },
-        riskEvaluation,
+          saldoAwal,
+          totalTransaksiAgg,
+          prevPinjamanAgg,
+          prevTotalAnggota,
+          totalPencairanAgg,
+          prevTransaksiAgg,
+        ] = await Promise.all([
+          snapshotCurrent
+            ? Promise.resolve(null)
+            : this.laporanRepository.groupTransaksiByJenis({
+                statusTransaksi: StatusTransaksi.APPROVED,
+                tanggalFrom: start,
+                tanggalTo: end,
+              }),
+          snapshotPrev
+            ? Promise.resolve(null)
+            : this.laporanRepository.groupTransaksiByJenis({
+                statusTransaksi: StatusTransaksi.APPROVED,
+                tanggalFrom: prevRange.start,
+                tanggalTo: prevRange.end,
+              }),
+          snapshotCurrent
+            ? Promise.resolve(null)
+            : this.laporanRepository.aggregatePinjamanPeriode({
+                tanggalFrom: start,
+                tanggalTo: end,
+              }),
+          this.laporanRepository.sumPinjamanAktifNominal(),
+          this.laporanRepository.sumSaldoSimpanan(),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            status: NasabahStatus.AKTIF,
+          }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+          }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            createdAt: { gte: start, lte: end },
+          }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            status: NasabahStatus.NONAKTIF,
+            updatedAt: { gte: start, lte: end },
+          }),
+          this.getSaldoAwal(bulan, tahun),
+          this.laporanRepository.countTransaksi({
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          }),
+          snapshotPrev
+            ? Promise.resolve(null)
+            : this.laporanRepository.aggregatePinjamanPeriode({
+                tanggalFrom: prevRange.start,
+                tanggalTo: prevRange.end,
+              }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            createdAt: { lte: prevRange.end },
+          }),
+          snapshotCurrent
+            ? this.laporanRepository.sumTransaksiNominal({
+                jenisTransaksi: JenisTransaksi.PENCAIRAN,
+                statusTransaksi: StatusTransaksi.APPROVED,
+                tanggalFrom: start,
+                tanggalTo: end,
+              })
+            : Promise.resolve(null),
+          this.laporanRepository.countTransaksi({
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: prevRange.start,
+            tanggalTo: prevRange.end,
+          }),
+        ]);
+
+        const mapTransaksiGrouped = (
+          grouped: Array<{
+            jenisTransaksi: JenisTransaksi;
+            _sum: { nominal: Prisma.Decimal | null };
+            _count: { _all: number };
+          }>,
+        ) => {
+          const totals: Record<JenisTransaksi, { sum: number; count: number }> =
+            {
+              [JenisTransaksi.SETORAN]: { sum: 0, count: 0 },
+              [JenisTransaksi.PENARIKAN]: { sum: 0, count: 0 },
+              [JenisTransaksi.PENCAIRAN]: { sum: 0, count: 0 },
+              [JenisTransaksi.ANGSURAN]: { sum: 0, count: 0 },
+            };
+
+          for (const row of grouped) {
+            totals[row.jenisTransaksi] = {
+              sum: this.toNumber(row._sum.nominal),
+              count: row._count._all,
+            };
+          }
+
+          const totalCount = grouped.reduce(
+            (acc, row) => acc + row._count._all,
+            0,
+          );
+
+          return { totals, totalCount };
+        };
+
+        const currentTransaksi = transaksiGrouped
+          ? mapTransaksiGrouped(transaksiGrouped)
+          : null;
+        const prevTransaksi = prevTransaksiGrouped
+          ? mapTransaksiGrouped(prevTransaksiGrouped)
+          : null;
+
+        const totalSimpananMasuk = snapshotCurrent
+          ? this.toNumber(snapshotCurrent.totalSimpanan)
+          : (currentTransaksi?.totals[JenisTransaksi.SETORAN].sum ?? 0);
+        const totalAngsuranDiterima = snapshotCurrent
+          ? this.toNumber(snapshotCurrent.totalAngsuran)
+          : (currentTransaksi?.totals[JenisTransaksi.ANGSURAN].sum ?? 0);
+        const totalPenarikan = snapshotCurrent
+          ? this.toNumber(snapshotCurrent.totalPenarikan)
+          : (currentTransaksi?.totals[JenisTransaksi.PENARIKAN].sum ?? 0);
+        const totalPencairan = snapshotCurrent
+          ? this.toNumber(totalPencairanAgg?._sum.nominal)
+          : (currentTransaksi?.totals[JenisTransaksi.PENCAIRAN].sum ?? 0);
+        const totalPinjamanDiberikan = snapshotCurrent
+          ? this.toNumber(snapshotCurrent.totalPinjaman)
+          : this.toNumber(pinjamanAgg?._sum.jumlahPinjaman);
+        const totalPinjamanAktif = this.toNumber(
+          totalPinjamanAktifAgg._sum.sisaPinjaman,
+        );
+        const totalSimpanan = this.toNumber(
+          totalSimpananAgg._sum.saldoBerjalan,
+        );
+        const totalTransaksi = totalTransaksiAgg._count._all;
+
+        const pemasukan = totalSimpananMasuk + totalAngsuranDiterima;
+        const pengeluaran = totalPenarikan + totalPencairan;
+        const saldoAkhir = snapshotCurrent
+          ? this.toNumber(snapshotCurrent.saldoAkhir)
+          : saldoAwal + pemasukan - pengeluaran;
+        const netCashflow = pemasukan - pengeluaran;
+
+        const prevTotalSimpananMasuk = snapshotPrev
+          ? this.toNumber(snapshotPrev.totalSimpanan)
+          : (prevTransaksi?.totals[JenisTransaksi.SETORAN].sum ?? 0);
+        const prevTotalPinjaman = snapshotPrev
+          ? this.toNumber(snapshotPrev.totalPinjaman)
+          : this.toNumber(prevPinjamanAgg?._sum.jumlahPinjaman);
+        const prevTotalTransaksi = prevTransaksiAgg._count._all;
+        const growthSimpanan = this.calculateGrowth(
+          totalSimpananMasuk,
+          prevTotalSimpananMasuk,
+        );
+        const growthPinjaman = this.calculateGrowth(
+          totalPinjamanDiberikan,
+          prevTotalPinjaman,
+        );
+        const growthTransaksi = this.calculateGrowth(
+          totalTransaksi,
+          prevTotalTransaksi,
+        );
+        const growthAnggota = this.calculateGrowth(
+          totalAnggota,
+          prevTotalAnggota,
+        );
+
+        const rasioLikuiditas = this.safeDivide(saldoAkhir, totalPenarikan);
+        const rasioCashCoverage = this.safeDivide(
+          totalAngsuranDiterima,
+          totalPencairan,
+        );
+        const rasioKreditAktif = this.safeDivide(
+          totalPinjamanAktif,
+          totalSimpanan,
+        );
+
+        const rasioKeaktifan = this.safeDivide(anggotaAktif, totalAnggota);
+        const rasioKeaktifanAnggota = rasioKeaktifan;
+
+        const riskEvaluation = {
+          likuiditas: this.getLikuiditasRisk(rasioLikuiditas),
+          ekspansiKredit: this.getEkspansiKreditRisk(rasioKreditAktif),
+          arusKas: this.getArusKasRisk(netCashflow),
+          ketahananKas: this.getKetahananKasRisk(rasioCashCoverage),
+          aktivitasAnggota: this.getAktivitasAnggotaRisk(rasioKeaktifanAnggota),
+        };
+
+        return {
+          message: 'Berhasil mengambil laporan bulanan',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalSimpananMasuk,
+              totalPinjamanDiberikan,
+              totalAngsuranDiterima,
+              totalPenarikan,
+              saldoAwal,
+              saldoAkhir,
+              anggotaAktif,
+              totalAnggota,
+              anggotaBaru,
+              anggotaKeluar,
+            },
+            performance: {
+              growthSimpanan,
+              growthPinjaman,
+              growthTransaksi,
+              growthAnggota,
+              netCashflow,
+            },
+            financialIndicators: {
+              rasioLikuiditas,
+              rasioKreditAktif,
+              rasioCashCoverage,
+              rasioKeaktifanAnggota,
+            },
+            riskEvaluation,
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanTransaksi(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const allJenis = Object.values(JenisTransaksi) as JenisTransaksi[];
-    const [grouped, totalAgg, totalNominalAgg] = await Promise.all([
-      this.laporanRepository.groupTransaksiByJenis({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.countTransaksi({
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: allJenis,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-    ]);
+    return this.cacheResponse(
+      this.getCacheKey('transaksi', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const allJenis = Object.values(JenisTransaksi) as JenisTransaksi[];
+        const [grouped, totalAgg, totalNominalAgg] = await Promise.all([
+          this.laporanRepository.groupTransaksiByJenis({
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          }),
+          this.laporanRepository.countTransaksi({
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          }),
+          this.laporanRepository.sumTransaksiNominal({
+            jenisTransaksi: allJenis,
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          }),
+        ]);
 
-    const totalTransaksi = totalAgg._count._all;
-    const totalNominal = this.toNumber(totalNominalAgg._sum.nominal);
-    const daysInMonth = end.getDate();
-    const rataRataPerHari = this.safeDivide(totalTransaksi, daysInMonth);
+        const totalTransaksi = totalAgg._count._all;
+        const totalNominal = this.toNumber(totalNominalAgg._sum.nominal);
+        const daysInMonth = end.getDate();
+        const rataRataPerHari = this.safeDivide(totalTransaksi, daysInMonth);
 
-    const jenisMap = this.buildJenisMap(allJenis, () => ({
-      jumlah: 0,
-      total: 0,
-      rataRataNominal: null as number | null,
-      persentaseDariTotalNominal: null as number | null,
-    }));
+        const jenisMap = this.buildJenisMap(allJenis, () => ({
+          jumlah: 0,
+          total: 0,
+          rataRataNominal: null as number | null,
+          persentaseDariTotalNominal: null as number | null,
+        }));
 
-    for (const row of grouped) {
-      const totalJenis = this.toNumber(row._sum.nominal);
-      const jumlahJenis = row._count._all;
-      jenisMap[row.jenisTransaksi] = {
-        jumlah: jumlahJenis,
-        total: totalJenis,
-        rataRataNominal: this.safeDivide(totalJenis, jumlahJenis),
-        persentaseDariTotalNominal: this.ratioOfTotal(totalJenis, totalNominal),
-      };
-    }
+        for (const row of grouped) {
+          const totalJenis = this.toNumber(row._sum.nominal);
+          const jumlahJenis = row._count._all;
+          jenisMap[row.jenisTransaksi] = {
+            jumlah: jumlahJenis,
+            total: totalJenis,
+            rataRataNominal: this.safeDivide(totalJenis, jumlahJenis),
+            persentaseDariTotalNominal: this.ratioOfTotal(
+              totalJenis,
+              totalNominal,
+            ),
+          };
+        }
 
-    return {
-      message: 'Berhasil mengambil laporan transaksi',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
-          totalTransaksi,
-          totalNominal,
-          rataRataPerHari,
-        },
-        breakdown: jenisMap,
+        return {
+          message: 'Berhasil mengambil laporan transaksi',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalTransaksi,
+              totalNominal,
+              rataRataPerHari,
+            },
+            breakdown: jenisMap,
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanAngsuran(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const totalAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.ANGSURAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const countAgg = await this.laporanRepository.countTransaksi({
-      jenisTransaksi: JenisTransaksi.ANGSURAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const totalPinjamanAktifAgg =
-      await this.laporanRepository.sumPinjamanAktifNominal();
-    const totalPencairanAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.PENCAIRAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const jumlahPeminjam =
-      await this.laporanRepository.countDistinctNasabahTransaksi({
-        jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      });
+    return this.cacheResponse(
+      this.getCacheKey('angsuran', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const totalAgg = await this.laporanRepository.sumTransaksiNominal({
+          jenisTransaksi: JenisTransaksi.ANGSURAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const countAgg = await this.laporanRepository.countTransaksi({
+          jenisTransaksi: JenisTransaksi.ANGSURAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const totalPinjamanAktifAgg =
+          await this.laporanRepository.sumPinjamanAktifNominal();
+        const totalPencairanAgg =
+          await this.laporanRepository.sumTransaksiNominal({
+            jenisTransaksi: JenisTransaksi.PENCAIRAN,
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          });
+        const jumlahPeminjam =
+          await this.laporanRepository.countDistinctNasabahTransaksi({
+            jenisTransaksi: JenisTransaksi.ANGSURAN,
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          });
 
-    const totalAngsuranMasuk = this.toNumber(totalAgg._sum.nominal);
-    const jumlahTransaksi = countAgg._count._all;
-    const totalPinjamanAktif = this.toNumber(
-      totalPinjamanAktifAgg._sum.sisaPinjaman,
-    );
-    const totalPencairanBulanIni = this.toNumber(
-      totalPencairanAgg._sum.nominal,
-    );
-    const rataRataAngsuran = this.safeDivide(
-      totalAngsuranMasuk,
-      jumlahTransaksi,
-    );
-    const rasioPembayaranLancar = this.safeDivide(
-      totalAngsuranMasuk,
-      totalPinjamanAktif,
-    );
-    const coverageTerhadapPencairan = this.safeDivide(
-      totalAngsuranMasuk,
-      totalPencairanBulanIni,
-    );
-    const rataRataPerPeminjam = this.safeDivide(
-      totalAngsuranMasuk,
-      jumlahPeminjam,
-    );
-
-    return {
-      message: 'Berhasil mengambil laporan angsuran',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
+        const totalAngsuranMasuk = this.toNumber(totalAgg._sum.nominal);
+        const jumlahTransaksi = countAgg._count._all;
+        const totalPinjamanAktif = this.toNumber(
+          totalPinjamanAktifAgg._sum.sisaPinjaman,
+        );
+        const totalPencairanBulanIni = this.toNumber(
+          totalPencairanAgg._sum.nominal,
+        );
+        const rataRataAngsuran = this.safeDivide(
           totalAngsuranMasuk,
           jumlahTransaksi,
-          rataRataAngsuran,
-        },
-        metrics: {
-          rasioPembayaranLancar,
-          coverageTerhadapPencairan,
-          rataRataPerPeminjam,
-        },
+        );
+        const rasioPembayaranLancar = this.safeDivide(
+          totalAngsuranMasuk,
+          totalPinjamanAktif,
+        );
+        const coverageTerhadapPencairan = this.safeDivide(
+          totalAngsuranMasuk,
+          totalPencairanBulanIni,
+        );
+        const rataRataPerPeminjam = this.safeDivide(
+          totalAngsuranMasuk,
+          jumlahPeminjam,
+        );
+
+        return {
+          message: 'Berhasil mengambil laporan angsuran',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalAngsuranMasuk,
+              jumlahTransaksi,
+              rataRataAngsuran,
+            },
+            metrics: {
+              rasioPembayaranLancar,
+              coverageTerhadapPencairan,
+              rataRataPerPeminjam,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanPenarikan(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const totalAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const totalCount = await this.laporanRepository.countTransaksi({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
-    const topNasabahNominal = await this.laporanRepository.topNasabahByNominal({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-      take: 3,
-    });
+    return this.cacheResponse(
+      this.getCacheKey('penarikan', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const totalAgg = await this.laporanRepository.sumTransaksiNominal({
+          jenisTransaksi: JenisTransaksi.PENARIKAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const totalCount = await this.laporanRepository.countTransaksi({
+          jenisTransaksi: JenisTransaksi.PENARIKAN,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const totalSimpananAgg =
+          await this.laporanRepository.sumSaldoSimpanan();
+        const topNasabahNominal =
+          await this.laporanRepository.topNasabahByNominal({
+            jenisTransaksi: JenisTransaksi.PENARIKAN,
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+            take: 3,
+          });
 
-    const totalPenarikan = this.toNumber(totalAgg._sum.nominal);
-    const jumlahTransaksi = totalCount._count._all;
-    const rataRataPenarikan = this.safeDivide(totalPenarikan, jumlahTransaksi);
-    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
-    const rasioTerhadapSimpanan = this.safeDivide(
-      totalPenarikan,
-      totalSimpanan,
-    );
-
-    const { start: prevStart, end: prevEnd } = this.getMonthRange(
-      bulan === 1 ? 12 : bulan - 1,
-      bulan === 1 ? tahun - 1 : tahun,
-    );
-    const prevAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: prevStart,
-      tanggalTo: prevEnd,
-    });
-    const prevTotal = this.toNumber(prevAgg._sum.nominal);
-    const pertumbuhanDariBulanLalu = this.calculateGrowth(
-      totalPenarikan,
-      prevTotal,
-    );
-
-    const top3Total = topNasabahNominal.reduce((acc, row) => {
-      return acc + this.toNumber(row._sum.nominal);
-    }, 0);
-    const konsentrasiTop3 = this.safeDivide(top3Total, totalPenarikan);
-
-    return {
-      message: 'Berhasil mengambil laporan penarikan',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
+        const totalPenarikan = this.toNumber(totalAgg._sum.nominal);
+        const jumlahTransaksi = totalCount._count._all;
+        const totalSimpanan = this.toNumber(
+          totalSimpananAgg._sum.saldoBerjalan,
+        );
+        const rataRataPenarikan = this.safeDivide(
           totalPenarikan,
           jumlahTransaksi,
-          rataRataPenarikan,
-        },
-        metrics: {
-          rasioTerhadapSimpanan,
-          pertumbuhanDariBulanLalu,
-          konsentrasiTop3,
-        },
+        );
+        const rasioTerhadapSimpanan = this.safeDivide(
+          totalPenarikan,
+          totalSimpanan,
+        );
+
+        const { start: prevStart, end: prevEnd } = this.getMonthRange(
+          bulan === 1 ? 12 : bulan - 1,
+          bulan === 1 ? tahun - 1 : tahun,
+        );
+        const prevAgg = await this.laporanRepository.sumTransaksiNominal({
+          jenisTransaksi: JenisTransaksi.PENARIKAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: prevStart,
+          tanggalTo: prevEnd,
+        });
+        const prevTotal = this.toNumber(prevAgg._sum.nominal);
+        const pertumbuhanDariBulanLalu = this.calculateGrowth(
+          totalPenarikan,
+          prevTotal,
+        );
+
+        const top3Total = topNasabahNominal.reduce((acc, row) => {
+          return acc + this.toNumber(row._sum.nominal);
+        }, 0);
+        const konsentrasiTop3 = this.safeDivide(top3Total, totalPenarikan);
+
+        return {
+          message: 'Berhasil mengambil laporan penarikan',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalPenarikan,
+              jumlahTransaksi,
+              rataRataPenarikan,
+            },
+            metrics: {
+              rasioTerhadapSimpanan,
+              pertumbuhanDariBulanLalu,
+              konsentrasiTop3,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanPinjaman(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const totalPinjamanAktif =
-      await this.laporanRepository.countPinjamanAktif();
-    const totalPinjamanAktifAgg =
-      await this.laporanRepository.sumPinjamanAktifNominal();
-    const pinjamanBaru = await this.laporanRepository.countPinjamanBaru({
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
-    const topOutstanding =
-      await this.laporanRepository.listTopOutstandingPinjaman(5);
+    return this.cacheResponse(
+      this.getCacheKey('pinjaman', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const totalPinjamanAktif =
+          await this.laporanRepository.countPinjamanAktif();
+        const totalPinjamanAktifAgg =
+          await this.laporanRepository.sumPinjamanAktifNominal();
+        const pinjamanBaru = await this.laporanRepository.countPinjamanBaru({
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const totalSimpananAgg =
+          await this.laporanRepository.sumSaldoSimpanan();
+        const topOutstanding =
+          await this.laporanRepository.listTopOutstandingPinjaman(5);
 
-    const totalOutstanding = this.toNumber(
-      totalPinjamanAktifAgg._sum.sisaPinjaman,
-    );
-    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
-    const rasioPinjamanTerhadapSimpanan = this.safeDivide(
-      totalOutstanding,
-      totalSimpanan,
-    );
-    const top5Outstanding = topOutstanding.reduce((acc, item) => {
-      return acc + this.toNumber(item.sisaPinjaman);
-    }, 0);
-    const konsentrasiTop5 = this.safeDivide(top5Outstanding, totalOutstanding);
-    const rataRataOutstanding = this.safeDivide(
-      totalOutstanding,
-      totalPinjamanAktif,
-    );
-
-    return {
-      message: 'Berhasil mengambil laporan pinjaman',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
-          totalPinjamanAktif,
+        const totalOutstanding = this.toNumber(
+          totalPinjamanAktifAgg._sum.sisaPinjaman,
+        );
+        const totalSimpanan = this.toNumber(
+          totalSimpananAgg._sum.saldoBerjalan,
+        );
+        const rasioPinjamanTerhadapSimpanan = this.safeDivide(
           totalOutstanding,
-          pinjamanBaru,
-        },
-        metrics: {
-          rasioPinjamanTerhadapSimpanan,
-          konsentrasiTop5,
-          rataRataOutstanding,
-        },
+          totalSimpanan,
+        );
+        const top5Outstanding = topOutstanding.reduce((acc, item) => {
+          return acc + this.toNumber(item.sisaPinjaman);
+        }, 0);
+        const konsentrasiTop5 = this.safeDivide(
+          top5Outstanding,
+          totalOutstanding,
+        );
+        const rataRataOutstanding = this.safeDivide(
+          totalOutstanding,
+          totalPinjamanAktif,
+        );
+
+        return {
+          message: 'Berhasil mengambil laporan pinjaman',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalPinjamanAktif,
+              totalOutstanding,
+              pinjamanBaru,
+            },
+            metrics: {
+              rasioPinjamanTerhadapSimpanan,
+              konsentrasiTop5,
+              rataRataOutstanding,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanSimpanan(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const saldoGrouped =
-      await this.laporanRepository.groupSaldoSimpananByJenis();
-    const totalSimpananAgg = await this.laporanRepository.sumSaldoSimpanan();
-    const setoranAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.SETORAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const penarikanAgg = await this.laporanRepository.sumTransaksiNominal({
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      statusTransaksi: StatusTransaksi.APPROVED,
-      tanggalFrom: start,
-      tanggalTo: end,
-    });
-    const anggotaAktif = await this.laporanRepository.countNasabah({
-      deletedAt: null,
-      status: NasabahStatus.AKTIF,
-    });
+    return this.cacheResponse(
+      this.getCacheKey('simpanan', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const saldoGrouped =
+          await this.laporanRepository.groupSaldoSimpananByJenis();
+        const totalSimpananAgg =
+          await this.laporanRepository.sumSaldoSimpanan();
+        const setoranAgg = await this.laporanRepository.sumTransaksiNominal({
+          jenisTransaksi: JenisTransaksi.SETORAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const penarikanAgg = await this.laporanRepository.sumTransaksiNominal({
+          jenisTransaksi: JenisTransaksi.PENARIKAN,
+          statusTransaksi: StatusTransaksi.APPROVED,
+          tanggalFrom: start,
+          tanggalTo: end,
+        });
+        const anggotaAktif = await this.laporanRepository.countNasabah({
+          deletedAt: null,
+          status: NasabahStatus.AKTIF,
+        });
 
-    const saldoMap: Record<string, number> = {
-      [JenisSimpanan.POKOK]: 0,
-      [JenisSimpanan.WAJIB]: 0,
-      [JenisSimpanan.SUKARELA]: 0,
-    };
+        const saldoMap: Record<string, number> = {
+          [JenisSimpanan.POKOK]: 0,
+          [JenisSimpanan.WAJIB]: 0,
+          [JenisSimpanan.SUKARELA]: 0,
+        };
 
-    for (const row of saldoGrouped) {
-      saldoMap[row.jenisSimpanan] = this.toNumber(row._sum.saldoBerjalan);
-    }
+        for (const row of saldoGrouped) {
+          saldoMap[row.jenisSimpanan] = this.toNumber(row._sum.saldoBerjalan);
+        }
 
-    const totalSimpanan = this.toNumber(totalSimpananAgg._sum.saldoBerjalan);
-    const totalSetoran = this.toNumber(setoranAgg._sum.nominal);
-    const totalPenarikan = this.toNumber(penarikanAgg._sum.nominal);
-    const prevTotal = totalSimpanan - (totalSetoran - totalPenarikan);
-    const growthSimpanan = this.calculateGrowth(totalSimpanan, prevTotal);
-    const rasioSukarela = this.safeDivide(
-      saldoMap[JenisSimpanan.SUKARELA],
-      totalSimpanan,
-    );
-    const rataRataSaldoAnggota = this.safeDivide(totalSimpanan, anggotaAktif);
-
-    return {
-      message: 'Berhasil mengambil laporan simpanan',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
+        const totalSimpanan = this.toNumber(
+          totalSimpananAgg._sum.saldoBerjalan,
+        );
+        const totalSetoran = this.toNumber(setoranAgg._sum.nominal);
+        const totalPenarikan = this.toNumber(penarikanAgg._sum.nominal);
+        const prevTotal = totalSimpanan - (totalSetoran - totalPenarikan);
+        const growthSimpanan = this.calculateGrowth(totalSimpanan, prevTotal);
+        const rasioSukarela = this.safeDivide(
+          saldoMap[JenisSimpanan.SUKARELA],
           totalSimpanan,
-          simpananPokok: saldoMap[JenisSimpanan.POKOK],
-          simpananWajib: saldoMap[JenisSimpanan.WAJIB],
-          simpananSukarela: saldoMap[JenisSimpanan.SUKARELA],
-        },
-        metrics: {
-          growthSimpanan,
-          rasioSukarela,
-          rataRataSaldoAnggota,
-        },
+        );
+        const rataRataSaldoAnggota = this.safeDivide(
+          totalSimpanan,
+          anggotaAktif,
+        );
+
+        return {
+          message: 'Berhasil mengambil laporan simpanan',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              totalSimpanan,
+              simpananPokok: saldoMap[JenisSimpanan.POKOK],
+              simpananWajib: saldoMap[JenisSimpanan.WAJIB],
+              simpananSukarela: saldoMap[JenisSimpanan.SUKARELA],
+            },
+            metrics: {
+              growthSimpanan,
+              rasioSukarela,
+              rataRataSaldoAnggota,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanCashflow(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
-    const [pemasukanAgg, pengeluaranAgg, saldoAwal] = await Promise.all([
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: [JenisTransaksi.PENARIKAN, JenisTransaksi.PENCAIRAN],
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-      this.getSaldoAwal(bulan, tahun),
-    ]);
-
-    const pemasukan = this.toNumber(pemasukanAgg._sum.nominal);
-    const pengeluaran = this.toNumber(pengeluaranAgg._sum.nominal);
-    const surplus = pemasukan - pengeluaran;
-    const saldoAkhir = saldoAwal + surplus;
-
-    const rasioLikuiditas = this.safeDivide(saldoAwal + pemasukan, pengeluaran);
-    const rasioPengeluaran = this.safeDivide(pengeluaran, pemasukan);
-
-    const prev = this.shiftMonth(bulan, tahun, -1);
-    const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
-    const [prevPemasukanAgg, prevPengeluaranAgg] = await Promise.all([
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: prevRange.start,
-        tanggalTo: prevRange.end,
-      }),
-      this.laporanRepository.sumTransaksiNominal({
-        jenisTransaksi: [JenisTransaksi.PENARIKAN, JenisTransaksi.PENCAIRAN],
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: prevRange.start,
-        tanggalTo: prevRange.end,
-      }),
-    ]);
-    const prevSurplus =
-      this.toNumber(prevPemasukanAgg._sum.nominal) -
-      this.toNumber(prevPengeluaranAgg._sum.nominal);
-    const surplusDelta = surplus - prevSurplus;
-
-    const monthRanges = Array.from({ length: 3 }, (_, index) => {
-      const shifted = this.shiftMonth(bulan, tahun, -index);
-      return this.getMonthRange(shifted.bulan, shifted.tahun);
-    });
-    const cashflowAggs = await Promise.all(
-      monthRanges.map(async (range) => {
-        const [inAgg, outAgg] = await Promise.all([
+    return this.cacheResponse(
+      this.getCacheKey('cashflow', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
+        const [pemasukanAgg, pengeluaranAgg, saldoAwal] = await Promise.all([
           this.laporanRepository.sumTransaksiNominal({
             jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
             statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: range.start,
-            tanggalTo: range.end,
+            tanggalFrom: start,
+            tanggalTo: end,
           }),
           this.laporanRepository.sumTransaksiNominal({
             jenisTransaksi: [
@@ -828,151 +917,221 @@ export class LaporanService {
               JenisTransaksi.PENCAIRAN,
             ],
             statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: range.start,
-            tanggalTo: range.end,
+            tanggalFrom: start,
+            tanggalTo: end,
           }),
+          this.getSaldoAwal(bulan, tahun),
         ]);
 
-        return {
-          pemasukan: this.toNumber(inAgg._sum.nominal),
-          pengeluaran: this.toNumber(outAgg._sum.nominal),
-        };
-      }),
-    );
-    let defisitBeruntun = 0;
-    for (const cashflow of cashflowAggs) {
-      const monthlySurplus = cashflow.pemasukan - cashflow.pengeluaran;
-      if (monthlySurplus < 0) {
-        defisitBeruntun += 1;
-      } else {
-        break;
-      }
-    }
+        const pemasukan = this.toNumber(pemasukanAgg._sum.nominal);
+        const pengeluaran = this.toNumber(pengeluaranAgg._sum.nominal);
+        const surplus = pemasukan - pengeluaran;
+        const saldoAkhir = saldoAwal + surplus;
 
-    return {
-      message: 'Berhasil mengambil laporan cashflow',
-      data: {
-        periode: { bulan, tahun },
-        summary: {
-          saldoAwal,
-          pemasukan,
+        const rasioLikuiditas = this.safeDivide(
+          saldoAwal + pemasukan,
           pengeluaran,
-          surplus,
-          saldoAkhir,
-        },
-        rasio: {
-          rasioLikuiditas,
-          rasioPengeluaran,
-        },
-        tren: {
-          surplusDelta,
-          defisitBeruntun,
-        },
+        );
+        const rasioPengeluaran = this.safeDivide(pengeluaran, pemasukan);
+
+        const prev = this.shiftMonth(bulan, tahun, -1);
+        const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
+        const [prevPemasukanAgg, prevPengeluaranAgg] = await Promise.all([
+          this.laporanRepository.sumTransaksiNominal({
+            jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: prevRange.start,
+            tanggalTo: prevRange.end,
+          }),
+          this.laporanRepository.sumTransaksiNominal({
+            jenisTransaksi: [
+              JenisTransaksi.PENARIKAN,
+              JenisTransaksi.PENCAIRAN,
+            ],
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: prevRange.start,
+            tanggalTo: prevRange.end,
+          }),
+        ]);
+        const prevSurplus =
+          this.toNumber(prevPemasukanAgg._sum.nominal) -
+          this.toNumber(prevPengeluaranAgg._sum.nominal);
+        const surplusDelta = surplus - prevSurplus;
+
+        const monthRanges = Array.from({ length: 3 }, (_, index) => {
+          const shifted = this.shiftMonth(bulan, tahun, -index);
+          return this.getMonthRange(shifted.bulan, shifted.tahun);
+        });
+        const cashflowAggs = await Promise.all(
+          monthRanges.map(async (range) => {
+            const [inAgg, outAgg] = await Promise.all([
+              this.laporanRepository.sumTransaksiNominal({
+                jenisTransaksi: [
+                  JenisTransaksi.SETORAN,
+                  JenisTransaksi.ANGSURAN,
+                ],
+                statusTransaksi: StatusTransaksi.APPROVED,
+                tanggalFrom: range.start,
+                tanggalTo: range.end,
+              }),
+              this.laporanRepository.sumTransaksiNominal({
+                jenisTransaksi: [
+                  JenisTransaksi.PENARIKAN,
+                  JenisTransaksi.PENCAIRAN,
+                ],
+                statusTransaksi: StatusTransaksi.APPROVED,
+                tanggalFrom: range.start,
+                tanggalTo: range.end,
+              }),
+            ]);
+
+            return {
+              pemasukan: this.toNumber(inAgg._sum.nominal),
+              pengeluaran: this.toNumber(outAgg._sum.nominal),
+            };
+          }),
+        );
+        let defisitBeruntun = 0;
+        for (const cashflow of cashflowAggs) {
+          const monthlySurplus = cashflow.pemasukan - cashflow.pengeluaran;
+          if (monthlySurplus < 0) {
+            defisitBeruntun += 1;
+          } else {
+            break;
+          }
+        }
+
+        return {
+          message: 'Berhasil mengambil laporan cashflow',
+          data: {
+            periode: { bulan, tahun },
+            summary: {
+              saldoAwal,
+              pemasukan,
+              pengeluaran,
+              surplus,
+              saldoAkhir,
+            },
+            rasio: {
+              rasioLikuiditas,
+              rasioPengeluaran,
+            },
+            tren: {
+              surplusDelta,
+              defisitBeruntun,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   async getLaporanAnggota(bulan: number, tahun: number) {
-    const { start, end } = this.getMonthRange(bulan, tahun);
+    return this.cacheResponse(
+      this.getCacheKey('anggota', bulan, tahun),
+      async () => {
+        const { start, end } = this.getMonthRange(bulan, tahun);
 
-    const [
-      totalTerdaftar,
-      anggotaAktif,
-      anggotaBaru,
-      anggotaKeluar,
-      anggotaDenganPinjamanAktif,
-      nasabahList,
-      lastTransaksi,
-      totalPinjamanAktifAgg,
-      anggotaDenganTransaksi,
-    ] = await Promise.all([
-      this.laporanRepository.countNasabah({ deletedAt: null }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        status: NasabahStatus.AKTIF,
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        createdAt: { gte: start, lte: end },
-      }),
-      this.laporanRepository.countNasabah({
-        deletedAt: null,
-        status: NasabahStatus.NONAKTIF,
-        updatedAt: { gte: start, lte: end },
-      }),
-      this.laporanRepository.countNasabahWithPinjamanAktif(),
-      this.laporanRepository.listNasabahBasic(),
-      this.laporanRepository.groupLastTransaksiPerNasabah(),
-      this.laporanRepository.sumPinjamanAktifNominal(),
-      this.laporanRepository.countDistinctNasabahTransaksi({
-        jenisTransaksi: Object.values(JenisTransaksi) as JenisTransaksi[],
-        statusTransaksi: StatusTransaksi.APPROVED,
-        tanggalFrom: start,
-        tanggalTo: end,
-      }),
-    ]);
-
-    const lastTransaksiMap = new Map<number, Date | null>();
-    for (const row of lastTransaksi) {
-      lastTransaksiMap.set(row.nasabahId, row._max.tanggal ?? null);
-    }
-
-    const thresholdTidakAktif = this.subtractMonths(end, 3);
-    let tidakAktifLebih3Bulan = 0;
-
-    for (const nasabah of nasabahList) {
-      if (nasabah.status !== NasabahStatus.AKTIF) {
-        continue;
-      }
-
-      const lastDate = lastTransaksiMap.get(nasabah.id) ?? null;
-      if (!lastDate || lastDate <= thresholdTidakAktif) {
-        tidakAktifLebih3Bulan += 1;
-      }
-    }
-    const totalPinjamanAktif = this.toNumber(
-      totalPinjamanAktifAgg._sum.sisaPinjaman,
-    );
-    const rataRataPinjamanPerAnggota = this.safeDivide(
-      totalPinjamanAktif,
-      anggotaDenganPinjamanAktif,
-    );
-    const rasioKeaktifan = this.safeDivide(anggotaAktif, totalTerdaftar);
-    const rasioPertumbuhan = this.safeDivide(
-      anggotaBaru - anggotaKeluar,
-      totalTerdaftar,
-    );
-    const rasioPartisipasiTransaksi = this.safeDivide(
-      anggotaDenganTransaksi,
-      anggotaAktif,
-    );
-    const rasioPinjamanAktif = this.safeDivide(
-      anggotaDenganPinjamanAktif,
-      anggotaAktif,
-    );
-
-    return {
-      message: 'Berhasil mengambil laporan anggota',
-      data: {
-        periode: { bulan, tahun },
-        population: {
+        const [
           totalTerdaftar,
           anggotaAktif,
           anggotaBaru,
           anggotaKeluar,
-        },
-        kredit: {
           anggotaDenganPinjamanAktif,
-          rataRataPinjamanPerAnggota,
-        },
-        rasio: {
-          rasioKeaktifan,
-          rasioPertumbuhan,
-          rasioPartisipasiTransaksi,
-          rasioPinjamanAktif,
-        },
+          nasabahList,
+          lastTransaksi,
+          totalPinjamanAktifAgg,
+          anggotaDenganTransaksi,
+        ] = await Promise.all([
+          this.laporanRepository.countNasabah({ deletedAt: null }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            status: NasabahStatus.AKTIF,
+          }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            createdAt: { gte: start, lte: end },
+          }),
+          this.laporanRepository.countNasabah({
+            deletedAt: null,
+            status: NasabahStatus.NONAKTIF,
+            updatedAt: { gte: start, lte: end },
+          }),
+          this.laporanRepository.countNasabahWithPinjamanAktif(),
+          this.laporanRepository.listNasabahBasic(),
+          this.laporanRepository.groupLastTransaksiPerNasabah(),
+          this.laporanRepository.sumPinjamanAktifNominal(),
+          this.laporanRepository.countDistinctNasabahTransaksi({
+            jenisTransaksi: Object.values(JenisTransaksi) as JenisTransaksi[],
+            statusTransaksi: StatusTransaksi.APPROVED,
+            tanggalFrom: start,
+            tanggalTo: end,
+          }),
+        ]);
+
+        const lastTransaksiMap = new Map<number, Date | null>();
+        for (const row of lastTransaksi) {
+          lastTransaksiMap.set(row.nasabahId, row._max.tanggal ?? null);
+        }
+
+        const thresholdTidakAktif = this.subtractMonths(end, 3);
+        let tidakAktifLebih3Bulan = 0;
+
+        for (const nasabah of nasabahList) {
+          if (nasabah.status !== NasabahStatus.AKTIF) {
+            continue;
+          }
+
+          const lastDate = lastTransaksiMap.get(nasabah.id) ?? null;
+          if (!lastDate || lastDate <= thresholdTidakAktif) {
+            tidakAktifLebih3Bulan += 1;
+          }
+        }
+        const totalPinjamanAktif = this.toNumber(
+          totalPinjamanAktifAgg._sum.sisaPinjaman,
+        );
+        const rataRataPinjamanPerAnggota = this.safeDivide(
+          totalPinjamanAktif,
+          anggotaDenganPinjamanAktif,
+        );
+        const rasioKeaktifan = this.safeDivide(anggotaAktif, totalTerdaftar);
+        const rasioPertumbuhan = this.safeDivide(
+          anggotaBaru - anggotaKeluar,
+          totalTerdaftar,
+        );
+        const rasioPartisipasiTransaksi = this.safeDivide(
+          anggotaDenganTransaksi,
+          anggotaAktif,
+        );
+        const rasioPinjamanAktif = this.safeDivide(
+          anggotaDenganPinjamanAktif,
+          anggotaAktif,
+        );
+
+        return {
+          message: 'Berhasil mengambil laporan anggota',
+          data: {
+            periode: { bulan, tahun },
+            population: {
+              totalTerdaftar,
+              anggotaAktif,
+              anggotaBaru,
+              anggotaKeluar,
+            },
+            kredit: {
+              anggotaDenganPinjamanAktif,
+              rataRataPinjamanPerAnggota,
+            },
+            rasio: {
+              rasioKeaktifan,
+              rasioPertumbuhan,
+              rasioPartisipasiTransaksi,
+              rasioPinjamanAktif,
+            },
+          },
+        };
       },
-    };
+    );
   }
 
   private async buildSnapshotTotals(bulan: number, tahun: number) {
@@ -1062,6 +1221,8 @@ export class LaporanService {
           generatedAt,
         });
 
+    await this.cacheService.del(this.getCacheKey('keuangan', bulan, tahun));
+
     return {
       message: 'Laporan keuangan berhasil di-generate',
       data: laporan,
@@ -1069,19 +1230,25 @@ export class LaporanService {
   }
 
   async getLaporanKeuangan(bulan: number, tahun: number) {
-    const laporan = await this.laporanRepository.findLaporanKeuanganByPeriode(
-      bulan,
-      tahun,
+    return this.cacheResponse(
+      this.getCacheKey('keuangan', bulan, tahun),
+      async () => {
+        const laporan =
+          await this.laporanRepository.findLaporanKeuanganByPeriode(
+            bulan,
+            tahun,
+          );
+
+        if (!laporan) {
+          throw new BadRequestException('Laporan keuangan tidak ditemukan');
+        }
+
+        return {
+          message: 'Berhasil mengambil laporan keuangan',
+          data: laporan,
+        };
+      },
     );
-
-    if (!laporan) {
-      throw new BadRequestException('Laporan keuangan tidak ditemukan');
-    }
-
-    return {
-      message: 'Berhasil mengambil laporan keuangan',
-      data: laporan,
-    };
   }
 
   async finalizeLaporanKeuangan(id: number) {
@@ -1097,6 +1264,10 @@ export class LaporanService {
     const updated = await this.laporanRepository.updateLaporanStatus(
       id,
       StatusLaporan.FINAL,
+    );
+
+    await this.cacheService.del(
+      this.getCacheKey('keuangan', laporan.periodeBulan, laporan.periodeTahun),
     );
 
     return {
