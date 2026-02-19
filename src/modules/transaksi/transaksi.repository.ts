@@ -51,6 +51,29 @@ export class TransaksiRepository {
     });
   }
 
+  sumNominalByNasabahPerTanggal(args: {
+    nasabahId: number;
+    tanggalFrom: Date;
+    tanggalTo: Date;
+  }) {
+    return this.prisma.transaksi.aggregate({
+      where: {
+        deletedAt: null,
+        nasabahId: args.nasabahId,
+        statusTransaksi: {
+          in: [StatusTransaksi.PENDING, StatusTransaksi.APPROVED],
+        },
+        tanggal: {
+          gte: args.tanggalFrom,
+          lte: args.tanggalTo,
+        },
+      },
+      _sum: {
+        nominal: true,
+      },
+    });
+  }
+
   findRekeningSimpananById(id: number, nasabahId: number) {
     return this.prisma.rekeningSimpanan.findFirst({
       where: { id, nasabahId, deletedAt: null },

@@ -43,6 +43,7 @@ export class PinjamanRepository {
       tenorBulan: number;
       sisaPinjaman: number;
       status: PinjamanStatus;
+      tanggalPersetujuan?: Date | null;
     },
     tx?: Prisma.TransactionClient,
   ) {

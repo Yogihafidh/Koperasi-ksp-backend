@@ -13,16 +13,25 @@ import {
 import { TransaksiRepository } from './transaksi.repository';
 import { CreateTransaksiDto } from './dto';
 import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
+import { SettingsService } from '../settings/settings.service';
+import { SETTING_KEYS } from '../settings/constants/settings.constants';
 
 @Injectable()
 export class TransaksiService {
-  constructor(private readonly transaksiRepository: TransaksiRepository) {}
+  constructor(
+    private readonly transaksiRepository: TransaksiRepository,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   private toDecimal(value: number) {
     return new Prisma.Decimal(value);
   }
 
   async createTransaksi(dto: CreateTransaksiDto, userId: number) {
+    const maxDailyNominal = await this.settingsService.getNumber(
+      SETTING_KEYS.TRANSACTION_MAX_DAILY_NOMINAL,
+    );
+
     const pegawai = await this.transaksiRepository.findPegawaiByUserId(userId);
     if (!pegawai) {
       throw new NotFoundException('Pegawai tidak ditemukan');
@@ -101,14 +110,45 @@ export class TransaksiService {
         if (!nominal.equals(pinjaman.jumlahPinjaman)) {
           throw new BadRequestException('Pencairan anda tidak sesuai');
         }
-      } else {
-        if (pinjaman.sisaPinjaman.lessThan(nominal)) {
-          throw new BadRequestException('Nominal melebihi sisa pinjaman');
-        }
+      } else if (pinjaman.sisaPinjaman.lessThan(nominal)) {
+        throw new BadRequestException('Nominal melebihi sisa pinjaman');
       }
     }
 
     const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
+
+    const tanggalFrom = new Date(
+      tanggal.getFullYear(),
+      tanggal.getMonth(),
+      tanggal.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const tanggalTo = new Date(
+      tanggal.getFullYear(),
+      tanggal.getMonth(),
+      tanggal.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
+
+    const dailyAgg = await this.transaksiRepository.sumNominalByNasabahPerTanggal(
+      {
+        nasabahId: dto.nasabahId,
+        tanggalFrom,
+        tanggalTo,
+      },
+    );
+    const totalToday = Number(dailyAgg._sum.nominal ?? 0);
+    if (totalToday + dto.nominal > maxDailyNominal) {
+      throw new BadRequestException(
+        `Total transaksi harian melebihi batas maksimum ${maxDailyNominal}`,
+      );
+    }
 
     const transaksi = await this.transaksiRepository.createTransaksi({
       nasabahId: dto.nasabahId,
@@ -162,16 +202,15 @@ export class TransaksiService {
         }
 
         const saldoBerjalan = transaksi.rekeningSimpanan.saldoBerjalan;
-        let saldoBaru = saldoBerjalan;
-
-        if (transaksi.jenisTransaksi === JenisTransaksi.SETORAN) {
-          saldoBaru = saldoBerjalan.plus(nominal);
-        } else {
-          if (saldoBerjalan.lessThan(nominal)) {
-            throw new BadRequestException('Saldo simpanan tidak mencukupi');
-          }
-          saldoBaru = saldoBerjalan.minus(nominal);
-        }
+        const saldoBaru =
+          transaksi.jenisTransaksi === JenisTransaksi.SETORAN
+            ? saldoBerjalan.plus(nominal)
+            : (() => {
+                if (saldoBerjalan.lessThan(nominal)) {
+                  throw new BadRequestException('Saldo simpanan tidak mencukupi');
+                }
+                return saldoBerjalan.minus(nominal);
+              })();
 
         const updated = await this.transaksiRepository.applyTransaksi({
           transaksiId: transaksi.id,

@@ -7,10 +7,15 @@ import {
   StatusTransaksi,
 } from '@prisma/client';
 import { DashboardRepository } from './dashboard.repository';
+import { SettingsService } from '../settings/settings.service';
+import { SETTING_KEYS } from '../settings/constants/settings.constants';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly dashboardRepository: DashboardRepository) {}
+  constructor(
+    private readonly dashboardRepository: DashboardRepository,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   private toNumber(value: Prisma.Decimal | number | null | undefined) {
     if (value === null || value === undefined) {
@@ -57,6 +62,11 @@ export class DashboardService {
   }
 
   async getDashboard(bulan: number, tahun: number) {
+    const trendMonthsSetting = await this.settingsService.getNumber(
+      SETTING_KEYS.DASHBOARD_TREND_MONTHS,
+    );
+    const trendMonths = Math.max(1, Math.floor(trendMonthsSetting));
+
     const { start, end } = this.getMonthRange(bulan, tahun);
     const snapshot =
       await this.dashboardRepository.findLaporanKeuanganByPeriode(bulan, tahun);
@@ -133,8 +143,8 @@ export class DashboardService {
       );
     }
 
-    const monthRanges = Array.from({ length: 6 }, (_, index) => {
-      const shifted = this.shiftMonth(bulan, tahun, -(5 - index));
+    const monthRanges = Array.from({ length: trendMonths }, (_, index) => {
+      const shifted = this.shiftMonth(bulan, tahun, -(trendMonths - 1 - index));
       return {
         bulan: shifted.bulan,
         tahun: shifted.tahun,

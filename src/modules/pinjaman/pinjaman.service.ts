@@ -23,6 +23,8 @@ import { TransaksiRepository } from '../transaksi/transaksi.repository';
 import { TransaksiService } from '../transaksi/transaksi.service';
 import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
 import { AuditTrailService } from '../audit/audit.service';
+import { SettingsService } from '../settings/settings.service';
+import { SETTING_KEYS } from '../settings/constants/settings.constants';
 
 @Injectable()
 export class PinjamanService {
@@ -31,6 +33,7 @@ export class PinjamanService {
     private readonly transaksiRepository: TransaksiRepository,
     private readonly transaksiService: TransaksiService,
     private readonly auditTrailService: AuditTrailService,
+    private readonly settingsService: SettingsService,
     private readonly prisma: PrismaClient,
   ) {}
 
@@ -43,6 +46,43 @@ export class PinjamanService {
     userId: number,
     ipAddress?: string,
   ) {
+    const [
+      maxTenorMonths,
+      minTenorMonths,
+      maxLoanAmount,
+      defaultInterestPercent,
+      autoApprovalLimit,
+    ] = await Promise.all([
+      this.settingsService.getNumber(SETTING_KEYS.LOAN_MAX_TENOR_MONTHS),
+      this.settingsService.getNumber(SETTING_KEYS.LOAN_MIN_TENOR_MONTHS),
+      this.settingsService.getNumber(SETTING_KEYS.LOAN_MAX_LOAN_AMOUNT),
+      this.settingsService.getNumber(
+        SETTING_KEYS.LOAN_DEFAULT_INTEREST_PERCENT,
+      ),
+      this.settingsService.getNumber(SETTING_KEYS.LOAN_AUTO_APPROVAL_LIMIT),
+    ]);
+
+    if (dto.tenorBulan > maxTenorMonths) {
+      throw new BadRequestException(
+        `Tenor pinjaman melebihi batas maksimum ${maxTenorMonths} bulan`,
+      );
+    }
+
+    if (dto.tenorBulan < minTenorMonths) {
+      throw new BadRequestException(
+        `Tenor pinjaman kurang dari batas minimum ${minTenorMonths} bulan`,
+      );
+    }
+
+    if (dto.jumlahPinjaman > maxLoanAmount) {
+      throw new BadRequestException(
+        `Jumlah pinjaman melebihi batas maksimum ${maxLoanAmount}`,
+      );
+    }
+
+    const bungaPersen = dto.bungaPersen ?? defaultInterestPercent;
+    const isAutoApproved = dto.jumlahPinjaman <= autoApprovalLimit;
+
     const nasabah = await this.pinjamanRepository.findNasabahById(
       dto.nasabahId,
     );
@@ -59,10 +99,13 @@ export class PinjamanService {
         {
           nasabahId: dto.nasabahId,
           jumlahPinjaman: dto.jumlahPinjaman,
-          bungaPersen: dto.bungaPersen,
+          bungaPersen,
           tenorBulan: dto.tenorBulan,
           sisaPinjaman: 0,
-          status: PinjamanStatus.PENDING,
+          status: isAutoApproved
+            ? PinjamanStatus.DISETUJUI
+            : PinjamanStatus.PENDING,
+          tanggalPersetujuan: isAutoApproved ? new Date() : null,
         },
         tx,
       );

@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { JenisTransaksi, PrismaClient, StatusTransaksi } from '@prisma/client';
+import {
+  JenisTransaksi,
+  PinjamanStatus,
+  Prisma,
+  PrismaClient,
+  StatusTransaksi,
+} from '@prisma/client';
 
 @Injectable()
 export class SimpananRepository {
@@ -21,6 +27,17 @@ export class SimpananRepository {
       select: {
         id: true,
         status: true,
+      },
+    });
+  }
+
+  countPinjamanAktifByNasabah(nasabahId: number): Promise<number> {
+    return this.prisma.pinjaman.count({
+      where: {
+        nasabahId,
+        deletedAt: null,
+        status: PinjamanStatus.DISETUJUI,
+        sisaPinjaman: { gt: new Prisma.Decimal(0) },
       },
     });
   }

@@ -3,12 +3,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { JenisTransaksi, NasabahStatus, StatusTransaksi } from '@prisma/client';
+import {
+  JenisSimpanan,
+  JenisTransaksi,
+  NasabahStatus,
+  PinjamanStatus,
+  Prisma,
+  PrismaClient,
+  StatusTransaksi,
+} from '@prisma/client';
 import { SimpananRepository } from './simpanan.repository';
 import { SimpananTransaksiDto } from './dto';
 import { TransaksiRepository } from '../transaksi/transaksi.repository';
 import { TransaksiService } from '../transaksi/transaksi.service';
 import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
+import { SettingsService } from '../settings/settings.service';
+import { SETTING_KEYS } from '../settings/constants/settings.constants';
 
 @Injectable()
 export class SimpananService {
@@ -16,6 +26,8 @@ export class SimpananService {
     private readonly simpananRepository: SimpananRepository,
     private readonly transaksiRepository: TransaksiRepository,
     private readonly transaksiService: TransaksiService,
+    private readonly settingsService: SettingsService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   async listRekeningByNasabah(nasabahId: number) {
@@ -48,6 +60,11 @@ export class SimpananService {
     dto: SimpananTransaksiDto,
     userId: number,
   ) {
+    const [minInitialDeposit, minMonthlyDeposit] = await Promise.all([
+      this.settingsService.getNumber(SETTING_KEYS.SAVINGS_MIN_INITIAL_DEPOSIT),
+      this.settingsService.getNumber(SETTING_KEYS.SAVINGS_MIN_MONTHLY_DEPOSIT),
+    ]);
+
     const pegawai = await this.simpananRepository.findPegawaiByUserId(userId);
     if (!pegawai) {
       throw new NotFoundException('Pegawai tidak ditemukan');
@@ -64,6 +81,21 @@ export class SimpananService {
 
     if (rekening.nasabah.status !== NasabahStatus.AKTIF) {
       throw new BadRequestException('Nasabah tidak aktif');
+    }
+
+    const isInitialDeposit = rekening.saldoBerjalan.lessThanOrEqualTo(0);
+    if (isInitialDeposit && dto.nominal < minInitialDeposit) {
+      throw new BadRequestException(
+        `Setoran awal minimum adalah ${minInitialDeposit}`,
+      );
+    }
+
+    const isMandatoryMonthlyDeposit =
+      rekening.jenisSimpanan === JenisSimpanan.WAJIB && !isInitialDeposit;
+    if (isMandatoryMonthlyDeposit && dto.nominal < minMonthlyDeposit) {
+      throw new BadRequestException(
+        `Setoran bulanan minimum adalah ${minMonthlyDeposit}`,
+      );
     }
 
     const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
@@ -89,6 +121,10 @@ export class SimpananService {
     dto: SimpananTransaksiDto,
     userId: number,
   ) {
+    const allowWithdrawalIfLoanActive = await this.settingsService.getBoolean(
+      SETTING_KEYS.SAVINGS_ALLOW_WITHDRAWAL_IF_LOAN_ACTIVE,
+    );
+
     const pegawai = await this.simpananRepository.findPegawaiByUserId(userId);
     if (!pegawai) {
       throw new NotFoundException('Pegawai tidak ditemukan');
@@ -105,6 +141,22 @@ export class SimpananService {
 
     if (rekening.nasabah.status !== NasabahStatus.AKTIF) {
       throw new BadRequestException('Nasabah tidak aktif');
+    }
+
+    if (!allowWithdrawalIfLoanActive) {
+      const activeLoans = await this.prisma.pinjaman.count({
+        where: {
+          nasabahId: rekening.nasabahId,
+          deletedAt: null,
+          status: PinjamanStatus.DISETUJUI,
+          sisaPinjaman: { gt: new Prisma.Decimal(0) },
+        },
+      });
+      if (activeLoans > 0) {
+        throw new BadRequestException(
+          'Penarikan tidak diizinkan karena nasabah masih memiliki pinjaman aktif',
+        );
+      }
     }
 
     if (rekening.saldoBerjalan.lessThan(dto.nominal)) {
