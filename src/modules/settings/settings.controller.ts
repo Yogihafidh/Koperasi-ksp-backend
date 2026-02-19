@@ -1,0 +1,65 @@
+import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Permissions, Roles } from '../../common/decorators';
+import {
+  JwtAuthGuard,
+  PermissionsGuard,
+  RolesGuard,
+} from '../../common/guards';
+import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
+import { UpsertSettingDto } from './dto';
+import { SettingsService } from './settings.service';
+
+@ApiTags('settings')
+@Controller('settings')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+export class SettingsController {
+  constructor(private readonly settingsService: SettingsService) {}
+
+  @Get()
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin')
+  @Permissions('settings.read')
+  @ApiOperation({ summary: 'Daftar seluruh settings sistem' })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar settings berhasil diambil',
+  })
+  @ApiAuthErrors()
+  listSettings() {
+    return this.settingsService.listSettings();
+  }
+
+  @Get(':key')
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin')
+  @Permissions('settings.read')
+  @ApiOperation({ summary: 'Detail setting berdasarkan key' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detail setting berhasil diambil',
+  })
+  @ApiAuthErrors()
+  getSetting(@Param('key') key: string) {
+    return this.settingsService.getSetting(key);
+  }
+
+  @Put(':key')
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin')
+  @Permissions('settings.update')
+  @ApiOperation({ summary: 'Buat atau update setting sistem' })
+  @ApiResponse({
+    status: 200,
+    description: 'Setting berhasil disimpan',
+  })
+  @ApiAuthErrors()
+  upsertSetting(@Param('key') key: string, @Body() dto: UpsertSettingDto) {
+    return this.settingsService.upsertSetting(key, dto);
+  }
+}

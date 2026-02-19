@@ -9,6 +9,7 @@ import { PinjamanModule } from './modules/pinjaman/pinjaman.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { LaporanModule } from './modules/laporan/laporan.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import databaseConfig from './config/database.config';
@@ -30,6 +31,7 @@ import databaseConfig from './config/database.config';
     AuditModule,
     LaporanModule,
     DashboardModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}
