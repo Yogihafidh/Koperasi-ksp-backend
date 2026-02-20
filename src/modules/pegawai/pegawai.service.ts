@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuditAction, PrismaClient } from '@prisma/client';
-import { PegawaiRepository } from './pegawai.repository';
+import { PegawaiListRow, PegawaiRepository } from './pegawai.repository';
 import {
   CreatePegawaiDto,
+  PegawaiDetailDto,
+  PegawaiListDto,
   UpdatePegawaiDto,
   TogglePegawaiStatusDto,
 } from './dto';
@@ -36,6 +38,18 @@ export class PegawaiService {
       noHp: data.noHp,
       alamat: data.alamat,
       statusAktif: data.statusAktif ?? true,
+    };
+  }
+
+  private toPegawaiListDto(item: PegawaiListRow): PegawaiListDto {
+    return {
+      id: item.id,
+      userId: item.userId,
+      nama: item.nama,
+      jabatan: item.jabatan,
+      noHp: item.noHp,
+      alamat: item.alamat,
+      statusAktif: item.statusAktif,
     };
   }
 
@@ -101,9 +115,10 @@ export class PegawaiService {
       cursor,
       DEFAULT_PAGE_SIZE,
     );
+
     return {
       message: 'Berhasil mengambil data pegawai',
-      data,
+      data: data.map((item) => this.toPegawaiListDto(item)),
       pagination: {
         nextCursor,
         limit: DEFAULT_PAGE_SIZE,
@@ -120,7 +135,7 @@ export class PegawaiService {
 
     return {
       message: 'Berhasil mengambil data pegawai',
-      data: pegawai,
+      data: pegawai as PegawaiDetailDto,
     };
   }
 

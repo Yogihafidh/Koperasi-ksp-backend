@@ -1,6 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 
+export const pegawaiListSelect = Prisma.validator<Prisma.PegawaiSelect>()({
+  id: true,
+  userId: true,
+  nama: true,
+  jabatan: true,
+  noHp: true,
+  alamat: true,
+  statusAktif: true,
+});
+
+export type PegawaiListRow = Prisma.PegawaiGetPayload<{
+  select: typeof pegawaiListSelect;
+}>;
+
 @Injectable()
 export class PegawaiRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -62,15 +76,7 @@ export class PegawaiRepository {
 
   async findAllPegawai(cursor: number | undefined, take: number) {
     const data = await this.prisma.pegawai.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-          },
-        },
-      },
+      select: pegawaiListSelect,
       orderBy: { id: 'desc' },
       take: take + 1,
       ...(cursor

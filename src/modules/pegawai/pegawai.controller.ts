@@ -114,12 +114,6 @@ export class PegawaiController {
               noHp: '081234567890',
               alamat: 'Jl. Melati No. 10, Bandung',
               statusAktif: true,
-              createdAt: '2026-02-05T10:00:00.000Z',
-              user: {
-                id: 2,
-                username: 'kasir1',
-                email: 'kasir1@koperasi.com',
-              },
             },
           ],
           pagination: {
