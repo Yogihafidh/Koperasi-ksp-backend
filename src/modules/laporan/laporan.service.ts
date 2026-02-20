@@ -86,6 +86,20 @@ export class LaporanService {
     return (current - previous) / previous;
   }
 
+  private formatGrowth(value: number | null) {
+    return (
+      value ??
+      'Tidak ada data bulan sebelumnya sehingga growth tidak dapat dihitung'
+    );
+  }
+
+  private formatNullableMetric(value: number | null) {
+    return (
+      value ??
+      'Tidak dapat dihitung karena data pembagi tidak tersedia atau bernilai 0'
+    );
+  }
+
   private roundTo(value: number, decimals: number) {
     const factor = 10 ** decimals;
     return Math.round(value * factor) / factor;
@@ -290,7 +304,7 @@ export class LaporanService {
 
   async getLaporanBulanan(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('bulanan', bulan, tahun),
+      this.getCacheKey('bulanan:v3', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const prev = this.shiftMonth(bulan, tahun, -1);
@@ -519,10 +533,10 @@ export class LaporanService {
               anggotaKeluar,
             },
             performance: {
-              growthSimpanan,
-              growthPinjaman,
-              growthTransaksi,
-              growthAnggota,
+              growthSimpanan: this.formatGrowth(growthSimpanan),
+              growthPinjaman: this.formatGrowth(growthPinjaman),
+              growthTransaksi: this.formatGrowth(growthTransaksi),
+              growthAnggota: this.formatGrowth(growthAnggota),
               netCashflow,
             },
             financialIndicators: {
@@ -544,27 +558,19 @@ export class LaporanService {
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const allJenis = Object.values(JenisTransaksi) as JenisTransaksi[];
-        const [grouped, totalAgg, totalNominalAgg] = await Promise.all([
-          this.laporanRepository.groupTransaksiByJenis({
+        const grouped = await this.laporanRepository.getTransaksiSummaryByJenis(
+          {
             statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
-          }),
-          this.laporanRepository.countTransaksi({
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: start,
-            tanggalTo: end,
-          }),
-          this.laporanRepository.sumTransaksiNominal({
-            jenisTransaksi: allJenis,
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: start,
-            tanggalTo: end,
-          }),
-        ]);
-
-        const totalTransaksi = totalAgg._count._all;
-        const totalNominal = this.toNumber(totalNominalAgg._sum.nominal);
+          },
+        );
+        const totalTransaksi = grouped.length
+          ? Number(grouped[0]?.total_count ?? 0)
+          : 0;
+        const totalNominal = grouped.length
+          ? this.toNumber(grouped[0]?.total_nominal ?? 0)
+          : 0;
         const daysInMonth = end.getDate();
         const rataRataPerHari = this.safeDivide(totalTransaksi, daysInMonth);
 
@@ -576,8 +582,8 @@ export class LaporanService {
         }));
 
         for (const row of grouped) {
-          const totalJenis = this.toNumber(row._sum.nominal);
-          const jumlahJenis = row._count._all;
+          const totalJenis = this.toNumber(row.total);
+          const jumlahJenis = Number(row.jumlah);
           jenisMap[row.jenisTransaksi] = {
             jumlah: jumlahJenis,
             total: totalJenis,
@@ -607,7 +613,7 @@ export class LaporanService {
 
   async getLaporanAngsuran(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('angsuran', bulan, tahun),
+      this.getCacheKey('angsuran:v2', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const totalAgg = await this.laporanRepository.sumTransaksiNominal({
@@ -671,12 +677,17 @@ export class LaporanService {
             summary: {
               totalAngsuranMasuk,
               jumlahTransaksi,
-              rataRataAngsuran,
+              rataRataAngsuran: this.formatNullableMetric(rataRataAngsuran),
             },
             metrics: {
-              rasioPembayaranLancar,
-              coverageTerhadapPencairan,
-              rataRataPerPeminjam,
+              rasioPembayaranLancar: this.formatNullableMetric(
+                rasioPembayaranLancar,
+              ),
+              coverageTerhadapPencairan: this.formatNullableMetric(
+                coverageTerhadapPencairan,
+              ),
+              rataRataPerPeminjam:
+                this.formatNullableMetric(rataRataPerPeminjam),
             },
           },
         };
@@ -686,7 +697,7 @@ export class LaporanService {
 
   async getLaporanPenarikan(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('penarikan', bulan, tahun),
+      this.getCacheKey('penarikan:v2', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const totalAgg = await this.laporanRepository.sumTransaksiNominal({
@@ -753,12 +764,16 @@ export class LaporanService {
             summary: {
               totalPenarikan,
               jumlahTransaksi,
-              rataRataPenarikan,
+              rataRataPenarikan: this.formatNullableMetric(rataRataPenarikan),
             },
             metrics: {
-              rasioTerhadapSimpanan,
-              pertumbuhanDariBulanLalu,
-              konsentrasiTop3,
+              rasioTerhadapSimpanan: this.formatNullableMetric(
+                rasioTerhadapSimpanan,
+              ),
+              pertumbuhanDariBulanLalu: this.formatGrowth(
+                pertumbuhanDariBulanLalu,
+              ),
+              konsentrasiTop3: this.formatNullableMetric(konsentrasiTop3),
             },
           },
         };
@@ -768,7 +783,7 @@ export class LaporanService {
 
   async getLaporanPinjaman(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('pinjaman', bulan, tahun),
+      this.getCacheKey('pinjaman:v2', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const totalPinjamanAktif =
@@ -816,9 +831,12 @@ export class LaporanService {
               pinjamanBaru,
             },
             metrics: {
-              rasioPinjamanTerhadapSimpanan,
-              konsentrasiTop5,
-              rataRataOutstanding,
+              rasioPinjamanTerhadapSimpanan: this.formatNullableMetric(
+                rasioPinjamanTerhadapSimpanan,
+              ),
+              konsentrasiTop5: this.formatNullableMetric(konsentrasiTop5),
+              rataRataOutstanding:
+                this.formatNullableMetric(rataRataOutstanding),
             },
           },
         };
@@ -828,7 +846,7 @@ export class LaporanService {
 
   async getLaporanSimpanan(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('simpanan', bulan, tahun),
+      this.getCacheKey('simpanan:v2', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const saldoGrouped =
@@ -889,9 +907,10 @@ export class LaporanService {
               simpananSukarela: saldoMap[JenisSimpanan.SUKARELA],
             },
             metrics: {
-              growthSimpanan,
-              rasioSukarela,
-              rataRataSaldoAnggota,
+              growthSimpanan: this.formatGrowth(growthSimpanan),
+              rasioSukarela: this.formatNullableMetric(rasioSukarela),
+              rataRataSaldoAnggota:
+                this.formatNullableMetric(rataRataSaldoAnggota),
             },
           },
         };
@@ -901,30 +920,51 @@ export class LaporanService {
 
   async getLaporanCashflow(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('cashflow', bulan, tahun),
+      this.getCacheKey('cashflow:v3', bulan, tahun),
       async () => {
-        const { start, end } = this.getMonthRange(bulan, tahun);
-        const [pemasukanAgg, pengeluaranAgg, saldoAwal] = await Promise.all([
-          this.laporanRepository.sumTransaksiNominal({
-            jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: start,
-            tanggalTo: end,
-          }),
-          this.laporanRepository.sumTransaksiNominal({
-            jenisTransaksi: [
-              JenisTransaksi.PENARIKAN,
-              JenisTransaksi.PENCAIRAN,
-            ],
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: start,
+        const { end } = this.getMonthRange(bulan, tahun);
+        const prev2 = this.shiftMonth(bulan, tahun, -2);
+        const rangeStart = this.getMonthRange(prev2.bulan, prev2.tahun).start;
+        const [cashflowRows, saldoAwal] = await Promise.all([
+          this.laporanRepository.getCashflowMonthlySummary({
+            tanggalFrom: rangeStart,
             tanggalTo: end,
           }),
           this.getSaldoAwal(bulan, tahun),
         ]);
 
-        const pemasukan = this.toNumber(pemasukanAgg._sum.nominal);
-        const pengeluaran = this.toNumber(pengeluaranAgg._sum.nominal);
+        const monthKey = (year: number, month: number) => `${year}-${month}`;
+
+        const summaryMap = new Map(
+          cashflowRows.map((row) => [
+            monthKey(row.tahun, row.bulan),
+            {
+              pemasukan: this.toNumber(row.pemasukan),
+              pengeluaran: this.toNumber(row.pengeluaran),
+            },
+          ]),
+        );
+
+        const currentKey = monthKey(tahun, bulan);
+        const prev = this.shiftMonth(bulan, tahun, -1);
+        const prevKey = monthKey(prev.tahun, prev.bulan);
+        const prev2Key = monthKey(prev2.tahun, prev2.bulan);
+
+        const currentSummary = summaryMap.get(currentKey) ?? {
+          pemasukan: 0,
+          pengeluaran: 0,
+        };
+        const prevSummary = summaryMap.get(prevKey) ?? {
+          pemasukan: 0,
+          pengeluaran: 0,
+        };
+        const prev2Summary = summaryMap.get(prev2Key) ?? {
+          pemasukan: 0,
+          pengeluaran: 0,
+        };
+
+        const pemasukan = currentSummary.pemasukan;
+        const pengeluaran = currentSummary.pengeluaran;
         const surplus = pemasukan - pengeluaran;
         const saldoAkhir = saldoAwal + surplus;
 
@@ -934,63 +974,10 @@ export class LaporanService {
         );
         const rasioPengeluaran = this.safeDivide(pengeluaran, pemasukan);
 
-        const prev = this.shiftMonth(bulan, tahun, -1);
-        const prevRange = this.getMonthRange(prev.bulan, prev.tahun);
-        const [prevPemasukanAgg, prevPengeluaranAgg] = await Promise.all([
-          this.laporanRepository.sumTransaksiNominal({
-            jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: prevRange.start,
-            tanggalTo: prevRange.end,
-          }),
-          this.laporanRepository.sumTransaksiNominal({
-            jenisTransaksi: [
-              JenisTransaksi.PENARIKAN,
-              JenisTransaksi.PENCAIRAN,
-            ],
-            statusTransaksi: StatusTransaksi.APPROVED,
-            tanggalFrom: prevRange.start,
-            tanggalTo: prevRange.end,
-          }),
-        ]);
-        const prevSurplus =
-          this.toNumber(prevPemasukanAgg._sum.nominal) -
-          this.toNumber(prevPengeluaranAgg._sum.nominal);
+        const prevSurplus = prevSummary.pemasukan - prevSummary.pengeluaran;
         const surplusDelta = surplus - prevSurplus;
 
-        const monthRanges = Array.from({ length: 3 }, (_, index) => {
-          const shifted = this.shiftMonth(bulan, tahun, -index);
-          return this.getMonthRange(shifted.bulan, shifted.tahun);
-        });
-        const cashflowAggs = await Promise.all(
-          monthRanges.map(async (range) => {
-            const [inAgg, outAgg] = await Promise.all([
-              this.laporanRepository.sumTransaksiNominal({
-                jenisTransaksi: [
-                  JenisTransaksi.SETORAN,
-                  JenisTransaksi.ANGSURAN,
-                ],
-                statusTransaksi: StatusTransaksi.APPROVED,
-                tanggalFrom: range.start,
-                tanggalTo: range.end,
-              }),
-              this.laporanRepository.sumTransaksiNominal({
-                jenisTransaksi: [
-                  JenisTransaksi.PENARIKAN,
-                  JenisTransaksi.PENCAIRAN,
-                ],
-                statusTransaksi: StatusTransaksi.APPROVED,
-                tanggalFrom: range.start,
-                tanggalTo: range.end,
-              }),
-            ]);
-
-            return {
-              pemasukan: this.toNumber(inAgg._sum.nominal),
-              pengeluaran: this.toNumber(outAgg._sum.nominal),
-            };
-          }),
-        );
+        const cashflowAggs = [currentSummary, prevSummary, prev2Summary];
         let defisitBeruntun = 0;
         for (const cashflow of cashflowAggs) {
           const monthlySurplus = cashflow.pemasukan - cashflow.pengeluaran;
@@ -1013,8 +1000,8 @@ export class LaporanService {
               saldoAkhir,
             },
             rasio: {
-              rasioLikuiditas,
-              rasioPengeluaran,
+              rasioLikuiditas: this.formatNullableMetric(rasioLikuiditas),
+              rasioPengeluaran: this.formatNullableMetric(rasioPengeluaran),
             },
             tren: {
               surplusDelta,
@@ -1028,7 +1015,7 @@ export class LaporanService {
 
   async getLaporanAnggota(bulan: number, tahun: number) {
     return this.cacheResponse(
-      this.getCacheKey('anggota', bulan, tahun),
+      this.getCacheKey('anggota:v2', bulan, tahun),
       async () => {
         const { start, end } = this.getMonthRange(bulan, tahun);
 
@@ -1038,8 +1025,6 @@ export class LaporanService {
           anggotaBaru,
           anggotaKeluar,
           anggotaDenganPinjamanAktif,
-          nasabahList,
-          lastTransaksi,
           totalPinjamanAktifAgg,
           anggotaDenganTransaksi,
         ] = await Promise.all([
@@ -1058,8 +1043,6 @@ export class LaporanService {
             updatedAt: { gte: start, lte: end },
           }),
           this.laporanRepository.countNasabahWithPinjamanAktif(),
-          this.laporanRepository.listNasabahBasic(),
-          this.laporanRepository.groupLastTransaksiPerNasabah(),
           this.laporanRepository.sumPinjamanAktifNominal(),
           this.laporanRepository.countDistinctNasabahTransaksi({
             jenisTransaksi: Object.values(JenisTransaksi) as JenisTransaksi[],
@@ -1068,25 +1051,6 @@ export class LaporanService {
             tanggalTo: end,
           }),
         ]);
-
-        const lastTransaksiMap = new Map<number, Date | null>();
-        for (const row of lastTransaksi) {
-          lastTransaksiMap.set(row.nasabahId, row._max.tanggal ?? null);
-        }
-
-        const thresholdTidakAktif = this.subtractMonths(end, 3);
-        let tidakAktifLebih3Bulan = 0;
-
-        for (const nasabah of nasabahList) {
-          if (nasabah.status !== NasabahStatus.AKTIF) {
-            continue;
-          }
-
-          const lastDate = lastTransaksiMap.get(nasabah.id) ?? null;
-          if (!lastDate || lastDate <= thresholdTidakAktif) {
-            tidakAktifLebih3Bulan += 1;
-          }
-        }
         const totalPinjamanAktif = this.toNumber(
           totalPinjamanAktifAgg._sum.sisaPinjaman,
         );
@@ -1120,13 +1084,17 @@ export class LaporanService {
             },
             kredit: {
               anggotaDenganPinjamanAktif,
-              rataRataPinjamanPerAnggota,
+              rataRataPinjamanPerAnggota: this.formatNullableMetric(
+                rataRataPinjamanPerAnggota,
+              ),
             },
             rasio: {
-              rasioKeaktifan,
-              rasioPertumbuhan,
-              rasioPartisipasiTransaksi,
-              rasioPinjamanAktif,
+              rasioKeaktifan: this.formatNullableMetric(rasioKeaktifan),
+              rasioPertumbuhan: this.formatNullableMetric(rasioPertumbuhan),
+              rasioPartisipasiTransaksi: this.formatNullableMetric(
+                rasioPartisipasiTransaksi,
+              ),
+              rasioPinjamanAktif: this.formatNullableMetric(rasioPinjamanAktif),
             },
           },
         };

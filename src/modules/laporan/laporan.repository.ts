@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   JenisSimpanan,
   JenisTransaksi,
+  NasabahStatus,
   PinjamanStatus,
   Prisma,
   PrismaClient,
@@ -82,6 +83,104 @@ export class LaporanRepository {
       _count: { _all: true },
       _sum: { nominal: true },
     });
+  }
+
+  async getTransaksiSummaryByJenis(args: {
+    statusTransaksi?: StatusTransaksi;
+    tanggalFrom?: Date;
+    tanggalTo?: Date;
+  }) {
+    const conditions: Prisma.Sql[] = [Prisma.sql`"deletedAt" IS NULL`];
+
+    if (args.statusTransaksi) {
+      conditions.push(
+        Prisma.sql`"statusTransaksi" = ${args.statusTransaksi}::"StatusTransaksi"`,
+      );
+    }
+
+    if (args.tanggalFrom) {
+      conditions.push(Prisma.sql`"tanggal" >= ${args.tanggalFrom}`);
+    }
+
+    if (args.tanggalTo) {
+      conditions.push(Prisma.sql`"tanggal" <= ${args.tanggalTo}`);
+    }
+
+    const whereSql = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    return this.prisma.$queryRaw<
+      Array<{
+        jenisTransaksi: JenisTransaksi;
+        jumlah: bigint;
+        total: Prisma.Decimal | null;
+        total_count: bigint;
+        total_nominal: Prisma.Decimal | null;
+      }>
+    >(
+      Prisma.sql`
+        SELECT
+          "jenisTransaksi",
+          COUNT(*) AS jumlah,
+          SUM("nominal") AS total,
+          SUM(COUNT(*)) OVER () AS total_count,
+          SUM(SUM("nominal")) OVER () AS total_nominal
+        FROM "Transaksi"
+        ${whereSql}
+        GROUP BY "jenisTransaksi"
+      `,
+    );
+  }
+
+  async getCashflowMonthlySummary(args: {
+    tanggalFrom: Date;
+    tanggalTo: Date;
+  }) {
+    const pemasukanJenis = [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN];
+    const pengeluaranJenis = [
+      JenisTransaksi.PENARIKAN,
+      JenisTransaksi.PENCAIRAN,
+    ];
+    const pemasukanJenisSql = pemasukanJenis.map(
+      (jenis) => Prisma.sql`${jenis}::"JenisTransaksi"`,
+    );
+    const pengeluaranJenisSql = pengeluaranJenis.map(
+      (jenis) => Prisma.sql`${jenis}::"JenisTransaksi"`,
+    );
+
+    return this.prisma.$queryRaw<
+      Array<{
+        tahun: number;
+        bulan: number;
+        pemasukan: Prisma.Decimal | null;
+        pengeluaran: Prisma.Decimal | null;
+      }>
+    >(
+      Prisma.sql`
+        SELECT
+          EXTRACT(YEAR FROM "tanggal")::int AS tahun,
+          EXTRACT(MONTH FROM "tanggal")::int AS bulan,
+          SUM(
+            CASE
+              WHEN "jenisTransaksi" IN (${Prisma.join(pemasukanJenisSql)})
+                THEN "nominal"
+              ELSE 0
+            END
+          ) AS pemasukan,
+          SUM(
+            CASE
+              WHEN "jenisTransaksi" IN (${Prisma.join(pengeluaranJenisSql)})
+                THEN "nominal"
+              ELSE 0
+            END
+          ) AS pengeluaran
+        FROM "Transaksi"
+        WHERE "deletedAt" IS NULL
+          AND "statusTransaksi" = ${StatusTransaksi.APPROVED}::"StatusTransaksi"
+          AND "tanggal" >= ${args.tanggalFrom}
+          AND "tanggal" <= ${args.tanggalTo}
+        GROUP BY tahun, bulan
+      `,
+    );
   }
 
   groupTransaksiByStatus(args: {
@@ -187,7 +286,7 @@ export class LaporanRepository {
     return this.prisma.pinjaman.aggregate({
       where: {
         deletedAt: null,
-        status: PinjamanStatus.DISETUJUI,
+        status: { in: [PinjamanStatus.DISETUJUI, PinjamanStatus.LUNAS] },
         tanggalPersetujuan: {
           gte: args.tanggalFrom,
           lte: args.tanggalTo,
@@ -204,7 +303,7 @@ export class LaporanRepository {
     return this.prisma.pinjaman.count({
       where: {
         deletedAt: null,
-        status: PinjamanStatus.DISETUJUI,
+        status: { in: [PinjamanStatus.DISETUJUI, PinjamanStatus.LUNAS] },
         tanggalPersetujuan: {
           gte: args.tanggalFrom,
           lte: args.tanggalTo,
@@ -262,18 +361,45 @@ export class LaporanRepository {
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
-    const grouped = await this.prisma.transaksi.groupBy({
-      by: ['nasabahId'],
-      where: this.buildTransaksiWhere({
-        jenisTransaksi: args.jenisTransaksi,
-        statusTransaksi: args.statusTransaksi,
-        tanggalFrom: args.tanggalFrom,
-        tanggalTo: args.tanggalTo,
-      }),
-      _count: { _all: true },
-    });
+    const conditions: Prisma.Sql[] = [Prisma.sql`"deletedAt" IS NULL`];
 
-    return grouped.length;
+    if (args.statusTransaksi) {
+      conditions.push(
+        Prisma.sql`"statusTransaksi" = ${args.statusTransaksi}::"StatusTransaksi"`,
+      );
+    }
+
+    if (args.jenisTransaksi) {
+      const jenisList = Array.isArray(args.jenisTransaksi)
+        ? args.jenisTransaksi
+        : [args.jenisTransaksi];
+      const jenisListSql = jenisList.map(
+        (jenis) => Prisma.sql`${jenis}::"JenisTransaksi"`,
+      );
+      conditions.push(
+        Prisma.sql`"jenisTransaksi" IN (${Prisma.join(jenisListSql)})`,
+      );
+    }
+
+    if (args.tanggalFrom) {
+      conditions.push(Prisma.sql`"tanggal" >= ${args.tanggalFrom}`);
+    }
+
+    if (args.tanggalTo) {
+      conditions.push(Prisma.sql`"tanggal" <= ${args.tanggalTo}`);
+    }
+
+    const whereSql = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    const result = await this.prisma.$queryRaw<{ count: bigint }[]>(
+      Prisma.sql`
+        SELECT COUNT(DISTINCT "nasabahId") AS count
+        FROM "Transaksi"
+        ${whereSql}
+      `,
+    );
+
+    return Number(result[0]?.count ?? 0);
   }
 
   topNasabahBySaldoSimpanan(take: number) {
@@ -343,27 +469,25 @@ export class LaporanRepository {
     return this.prisma.nasabah.count({ where });
   }
 
-  listNasabahBasic() {
-    return this.prisma.nasabah.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  }
+  async countNasabahAktifTidakTransaksiSejak(args: { threshold: Date }) {
+    const result = await this.prisma.$queryRaw<{ count: bigint }[]>(
+      Prisma.sql`
+        SELECT COUNT(*) AS count
+        FROM "Nasabah" n
+        LEFT JOIN (
+          SELECT "nasabahId", MAX("tanggal") AS last_trx
+          FROM "Transaksi"
+          WHERE "deletedAt" IS NULL
+            AND "statusTransaksi" = ${StatusTransaksi.APPROVED}
+          GROUP BY "nasabahId"
+        ) t ON t."nasabahId" = n."id"
+        WHERE n."deletedAt" IS NULL
+          AND n."status" = ${NasabahStatus.AKTIF}
+          AND (t.last_trx IS NULL OR t.last_trx <= ${args.threshold})
+      `,
+    );
 
-  groupLastTransaksiPerNasabah() {
-    return this.prisma.transaksi.groupBy({
-      by: ['nasabahId'],
-      where: {
-        deletedAt: null,
-        statusTransaksi: StatusTransaksi.APPROVED,
-      },
-      _max: { tanggal: true },
-    });
+    return Number(result[0]?.count ?? 0);
   }
 
   async countNasabahWithPinjamanAktif() {
