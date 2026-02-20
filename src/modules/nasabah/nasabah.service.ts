@@ -12,9 +12,11 @@ import {
   Prisma,
   PrismaClient,
 } from '@prisma/client';
-import { NasabahRepository } from './nasabah.repository';
+import { NasabahListRow, NasabahRepository } from './nasabah.repository';
 import {
   CreateNasabahDto,
+  NasabahDetailDto,
+  NasabahListDto,
   UpdateNasabahDto,
   VerifikasiNasabahDto,
   UpdateNasabahStatusDto,
@@ -72,6 +74,20 @@ export class NasabahService {
       tanggalDaftar: data.tanggalDaftar ?? null,
       status: data.status ?? null,
       catatan: data.catatan ?? null,
+    };
+  }
+
+  private toNasabahListDto(item: NasabahListRow): NasabahListDto {
+    return {
+      id: item.id,
+      nomorAnggota: item.nomorAnggota,
+      nama: item.nama,
+      nik: item.nik,
+      noHp: item.noHp,
+      pekerjaan: item.pekerjaan,
+      instansi: item.instansi ?? null,
+      status: item.status,
+      tanggalDaftar: item.tanggalDaftar,
     };
   }
 
@@ -174,9 +190,10 @@ export class NasabahService {
       cursor,
       DEFAULT_PAGE_SIZE,
     );
+
     return {
       message: 'Berhasil mengambil data nasabah',
-      data,
+      data: data.map((item) => this.toNasabahListDto(item)),
       pagination: {
         nextCursor,
         limit: DEFAULT_PAGE_SIZE,
@@ -193,7 +210,7 @@ export class NasabahService {
 
     return {
       message: 'Berhasil mengambil data nasabah',
-      data: nasabah,
+      data: nasabah as NasabahDetailDto,
     };
   }
 

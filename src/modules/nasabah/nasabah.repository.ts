@@ -7,6 +7,22 @@ import {
   JenisSimpanan,
 } from '@prisma/client';
 
+export const nasabahListSelect = Prisma.validator<Prisma.NasabahSelect>()({
+  id: true,
+  nomorAnggota: true,
+  nama: true,
+  nik: true,
+  noHp: true,
+  pekerjaan: true,
+  instansi: true,
+  status: true,
+  tanggalDaftar: true,
+});
+
+export type NasabahListRow = Prisma.NasabahGetPayload<{
+  select: typeof nasabahListSelect;
+}>;
+
 @Injectable()
 export class NasabahRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -79,19 +95,7 @@ export class NasabahRepository {
   async findAllNasabah(cursor: number | undefined, take: number) {
     const data = await this.prisma.nasabah.findMany({
       where: { deletedAt: null },
-      include: {
-        pegawai: {
-          select: {
-            id: true,
-            nama: true,
-            jabatan: true,
-          },
-        },
-        user: {
-          select: { id: true, username: true, email: true },
-        },
-        dokumen: true,
-      },
+      select: nasabahListSelect,
       orderBy: { id: 'desc' },
       take: take + 1,
       ...(cursor

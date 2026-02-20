@@ -110,8 +110,12 @@ export class NasabahController {
               id: 1,
               nomorAnggota: 'AGT-20260205-1234',
               nama: 'Siti Aminah',
+              nik: '3273011201900001',
+              noHp: '081234567890',
+              pekerjaan: 'Wiraswasta',
+              instansi: 'CV Maju Sejahtera',
               status: 'PENDING',
-              statusKeterangan: 'Menunggu verifikasi pimpinan',
+              tanggalDaftar: '2026-02-05T00:00:00.000Z',
             },
           ],
           pagination: {
