@@ -13,6 +13,9 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,13 +27,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image
+      - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/ksp-api:latest .
+          docker build -t $IMAGE_NAME .
 
-      - name: Push image
+      - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/ksp-api:latest
+          docker push $IMAGE_NAME
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -39,7 +42,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull ghcr.io/${{ github.repository_owner }}/ksp-api:latest
+            docker pull $IMAGE_NAME
             docker stop koperasi_api || true
             docker rm koperasi_api || true
             docker run -d \
@@ -47,4 +50,5 @@ jobs:
               --network ksp_koperasi_network \
               --env-file /var/www/ksp/.env.production \
               -p 3000:3000 \
-              ghcr.io/${{ github.repository_owner }}/ksp-api:latest
+              --restart always \
+              $IMAGE_NAME
