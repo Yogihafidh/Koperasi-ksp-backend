@@ -8,9 +8,9 @@ RUN npm install
 
 COPY . .
 
-# Generate prisma client tanpa butuh DB
-RUN npx prisma generate --schema=./prisma/schema.prisma
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db"
 
+RUN npx prisma generate
 RUN npm run build
 
 
