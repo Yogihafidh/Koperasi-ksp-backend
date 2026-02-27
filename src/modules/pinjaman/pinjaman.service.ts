@@ -118,8 +118,8 @@ export class PinjamanService {
           userId,
           after: {
             nasabahId: created.nasabahId,
-            jumlahPinjaman: created.jumlahPinjaman,
-            bungaPersen: created.bungaPersen,
+            jumlahPinjaman: Number(created.jumlahPinjaman),
+            bungaPersen: Number(created.bungaPersen),
             tenorBulan: created.tenorBulan,
             status: created.status,
           },
@@ -225,12 +225,14 @@ export class PinjamanService {
           before: {
             status: pinjaman.status,
             verifiedById: pinjaman.verifiedById ?? null,
-            tanggalPersetujuan: pinjaman.tanggalPersetujuan ?? null,
+            tanggalPersetujuan:
+              pinjaman.tanggalPersetujuan?.toISOString() ?? null,
           },
           after: {
             status: result.status,
             verifiedById: result.verifiedById ?? null,
-            tanggalPersetujuan: result.tanggalPersetujuan ?? null,
+            tanggalPersetujuan:
+              result.tanggalPersetujuan?.toISOString() ?? null,
           },
           ipAddress,
         },
