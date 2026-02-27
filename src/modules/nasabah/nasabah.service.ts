@@ -61,6 +61,10 @@ export class NasabahService {
     status?: NasabahStatus | null;
     catatan?: string | null;
   }) {
+    const penghasilan = data.penghasilanBulanan;
+    const tanggalLahir = data.tanggalLahir;
+    const tanggalDaftar = data.tanggalDaftar;
+
     return {
       nomorAnggota: data.nomorAnggota ?? null,
       nama: data.nama ?? null,
@@ -69,9 +73,15 @@ export class NasabahService {
       noHp: data.noHp ?? null,
       pekerjaan: data.pekerjaan ?? null,
       instansi: data.instansi ?? null,
-      penghasilanBulanan: data.penghasilanBulanan ?? null,
-      tanggalLahir: data.tanggalLahir ?? null,
-      tanggalDaftar: data.tanggalDaftar ?? null,
+      penghasilanBulanan: penghasilan != null ? Number(penghasilan) : null,
+      tanggalLahir:
+        tanggalLahir instanceof Date
+          ? tanggalLahir.toISOString()
+          : (tanggalLahir ?? null),
+      tanggalDaftar:
+        tanggalDaftar instanceof Date
+          ? tanggalDaftar.toISOString()
+          : (tanggalDaftar ?? null),
       status: data.status ?? null,
       catatan: data.catatan ?? null,
     };
