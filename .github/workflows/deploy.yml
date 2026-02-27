@@ -36,20 +36,19 @@ jobs:
           docker push $IMAGE_NAME
 
       - name: Deploy to server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 146.190.111.184
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            docker pull $IMAGE_NAME
-            docker stop koperasi_api || true
-            docker rm koperasi_api || true
-            docker run -d \
-              --name koperasi_api \
-              --network ksp_koperasi_network \
-              --env-file /var/www/ksp/.env.production \
-              -p 3000:3000 \
-              --restart always \
-              $IMAGE_NAME
- 
+  uses: appleboy/ssh-action@v1.0.3
+  with:
+    host: 146.190.111.184
+    username: root
+    key: ${{ secrets.SSH_PRIVATE_KEY }}
+    script: |
+      docker pull ghcr.io/yogihafidh/ksp-api:latest
+      docker stop koperasi_api || true
+      docker rm koperasi_api || true
+      docker run -d \
+        --name koperasi_api \
+        --network ksp_koperasi_network \
+        --env-file /var/www/ksp/.env.production \
+        -p 3000:3000 \
+        --restart always \
+        ghcr.io/yogihafidh/ksp-api:latest
