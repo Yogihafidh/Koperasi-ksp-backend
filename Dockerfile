@@ -8,7 +8,9 @@ RUN npm install
 
 COPY . .
 
-RUN npx prisma generate
+# Generate prisma client tanpa butuh DB
+RUN npx prisma generate --schema=./prisma/schema.prisma
+
 RUN npm run build
 
 
@@ -22,8 +24,9 @@ RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "node dist/main.js"]
