@@ -3,12 +3,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { winstonLogger } from './common/logger/winston.logger';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   // Set timezone to Asia/Jakarta
   process.env.TZ = 'Asia/Jakarta';
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: winstonLogger,
+  });
 
   // Ambil ConfigService untuk baca config
   const configService = app.get(ConfigService);
@@ -21,6 +25,8 @@ async function bootstrap() {
       transform: true, // Auto transform payload ke DTO instance
     }),
   );
+
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const corsEnabled = configService.get<boolean>('app.corsEnabled');
   if (corsEnabled) {
@@ -81,10 +87,17 @@ async function bootstrap() {
   await app.listen(port);
 
   // Log informasi startup
-  console.log(
+  winstonLogger.log(
     `🚀 Application is running on: http://localhost:${port}/${apiPrefix}`,
+    'Bootstrap',
   );
-  console.log(`📚 Swagger Documentation: http://localhost:${port}/api-docs`);
-  console.log(`📝 Environment: ${configService.get<string>('app.nodeEnv')}`);
+  winstonLogger.log(
+    `📚 Swagger Documentation: http://localhost:${port}/api-docs`,
+    'Bootstrap',
+  );
+  winstonLogger.log(
+    `📝 Environment: ${configService.get<string>('app.nodeEnv')}`,
+    'Bootstrap',
+  );
 }
 void bootstrap();
