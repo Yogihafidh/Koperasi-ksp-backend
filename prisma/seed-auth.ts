@@ -324,6 +324,25 @@ async function seed() {
       },
     });
 
+    await prisma.pegawai.upsert({
+      where: { userId: adminUser.id },
+      update: {
+        nama: 'Admin Koperasi',
+        jabatan: 'Administrator',
+        noHp: '081200000000',
+        alamat: 'Kantor Pusat Koperasi',
+        statusAktif: true,
+      },
+      create: {
+        userId: adminUser.id,
+        nama: 'Admin Koperasi',
+        jabatan: 'Administrator',
+        noHp: '081200000000',
+        alamat: 'Kantor Pusat Koperasi',
+        statusAktif: true,
+      },
+    });
+
     console.log('Created default admin user');
     console.log('Username: admin');
     console.log('Email: admin@koperasi.com');
@@ -337,4 +356,4 @@ async function seed() {
   }
 }
 
-seed();
+void seed();
