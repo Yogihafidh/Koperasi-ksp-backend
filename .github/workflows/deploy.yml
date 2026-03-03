@@ -14,7 +14,7 @@ jobs:
       packages: write
 
     env:
-      IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:latest
+      IMAGE_NAME: IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:${{ github.sha }}
 
     steps:
       - name: Checkout code
