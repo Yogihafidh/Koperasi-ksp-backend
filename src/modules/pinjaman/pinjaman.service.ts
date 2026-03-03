@@ -80,7 +80,7 @@ export class PinjamanService {
       );
     }
 
-    const bungaPersen = dto.bungaPersen ?? defaultInterestPercent;
+    const bungaPersen = defaultInterestPercent;
     const isAutoApproved = dto.jumlahPinjaman <= autoApprovalLimit;
 
     const nasabah = await this.pinjamanRepository.findNasabahById(

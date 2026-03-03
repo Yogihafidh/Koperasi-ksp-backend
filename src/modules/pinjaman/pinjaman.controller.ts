@@ -49,8 +49,24 @@ export class PinjamanController {
   @ApiBearerAuth('JWT-auth')
   @Roles('Admin', 'Staff')
   @Permissions('pinjaman.ajukan')
-  @ApiOperation({ summary: 'Pengajuan pinjaman' })
-  @ApiBody({ type: CreatePinjamanDto })
+  @ApiOperation({
+    summary: 'Pengajuan pinjaman',
+    description:
+      'Bunga pinjaman tidak dikirim dari request. Nilai bungaPersen otomatis diambil dari settings koperasi (loan.defaultInterestPercent) dan disimpan sebagai snapshot ke data pinjaman saat create.',
+  })
+  @ApiBody({
+    type: CreatePinjamanDto,
+    examples: {
+      default: {
+        summary: 'Contoh pengajuan pinjaman',
+        value: {
+          nasabahId: 1,
+          jumlahPinjaman: 5000000,
+          tenorBulan: 12,
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Pengajuan pinjaman berhasil dibuat',
