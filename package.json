@@ -20,6 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:integration": "jest --config ./test/jest-integration.json --runInBand"
   },
+  "prisma": {
+    "seed": "node prisma/seed-auth.js"
+  },
   "dependencies": {
     "@keyv/redis": "^3.0.1",
     "@nestjs/cache-manager": "^3.0.1",
