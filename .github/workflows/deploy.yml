@@ -14,7 +14,7 @@ jobs:
       packages: write
 
     env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ksp-api:${{ github.sha }}
+      IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:${{ github.sha }}
 
     steps:
       - name: Checkout code
@@ -28,7 +28,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
-        run: docker build -t $IMAGE_NAME .
+        run: |
+          IMAGE_NAME_LOWER=$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')
+          docker build -t $IMAGE_NAME_LOWER .
+          echo "IMAGE_NAME=$IMAGE_NAME_LOWER" >> $GITHUB_ENV
 
       - name: Push Docker image
         run: docker push $IMAGE_NAME
