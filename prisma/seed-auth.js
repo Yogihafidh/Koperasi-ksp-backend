@@ -1,6 +1,5 @@
-// Auth Module Seeder
-import { PrismaClient, SettingValueType } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 
@@ -11,61 +10,50 @@ async function seed() {
     // Create Permissions
     console.log('1. Creating permissions...');
     const permissions = [
-      // User permissions
       { code: 'user.create', description: 'Create user' },
       { code: 'user.read', description: 'Read user' },
       { code: 'user.update', description: 'Update user' },
       { code: 'user.delete', description: 'Delete user' },
 
-      // Role permissions
       { code: 'role.create', description: 'Create role' },
       { code: 'role.read', description: 'Read role' },
       { code: 'role.update', description: 'Update role' },
       { code: 'role.delete', description: 'Delete role' },
 
-      // Permission permissions
       { code: 'permission.create', description: 'Create permission' },
       { code: 'permission.read', description: 'Read permission' },
       { code: 'permission.delete', description: 'Delete permission' },
 
-      // Nasabah permissions
       { code: 'nasabah.create', description: 'Create nasabah' },
       { code: 'nasabah.read', description: 'Read nasabah' },
       { code: 'nasabah.update', description: 'Update nasabah' },
       { code: 'nasabah.delete', description: 'Delete nasabah' },
 
-      // Pegawai permissions
       { code: 'pegawai.create', description: 'Create pegawai' },
       { code: 'pegawai.read', description: 'Read pegawai' },
       { code: 'pegawai.update', description: 'Update pegawai' },
       { code: 'pegawai.delete', description: 'Delete pegawai' },
 
-      // Simpanan permissions
       { code: 'simpanan.read', description: 'Read simpanan' },
       { code: 'simpanan.setor', description: 'Setor simpanan' },
       { code: 'simpanan.tarik', description: 'Tarik simpanan' },
 
-      // Pinjaman permissions
       { code: 'pinjaman.ajukan', description: 'Ajukan pinjaman' },
       { code: 'pinjaman.read', description: 'Read pinjaman' },
       { code: 'pinjaman.verify', description: 'Verifikasi pinjaman' },
       { code: 'pinjaman.cairkan', description: 'Pencairan pinjaman' },
       { code: 'pinjaman.angsuran', description: 'Bayar angsuran pinjaman' },
 
-      // Transaksi permissions
       { code: 'transaksi.create', description: 'Create transaksi' },
       { code: 'transaksi.read', description: 'Read transaksi' },
       { code: 'transaksi.process', description: 'Process transaksi' },
 
-      // Laporan permissions
       { code: 'laporan.read', description: 'Read laporan' },
       { code: 'laporan.generate', description: 'Generate laporan' },
       { code: 'laporan.finalize', description: 'Finalize laporan' },
 
-      // Dashboard permissions
       { code: 'dashboard.read', description: 'Read dashboard' },
 
-      // Settings permissions
       { code: 'settings.read', description: 'Read settings' },
       { code: 'settings.update', description: 'Update settings' },
     ];
@@ -77,14 +65,11 @@ async function seed() {
         create: permission,
       });
     }
+
     console.log(`Created ${permissions.length} permissions`);
 
-    const defaultSettings: Array<{
-      key: string;
-      value: string;
-      valueType: SettingValueType;
-      description: string;
-    }> = [
+    // Default Settings
+    const defaultSettings = [
       {
         key: 'loan.maxTenorMonths',
         value: '24',
@@ -158,6 +143,7 @@ async function seed() {
         create: item,
       });
     }
+
     console.log(`Created ${defaultSettings.length} default settings`);
 
     // Create Roles
@@ -203,15 +189,18 @@ async function seed() {
     // Assign all permissions to Admin
     console.log('3.1 Assigning permissions to Admin role...');
     const allPermissions = await prisma.permission.findMany();
+
     await prisma.rolePermission.deleteMany({
       where: { roleId: adminRole.id },
     });
+
     await prisma.rolePermission.createMany({
       data: allPermissions.map((p) => ({
         roleId: adminRole.id,
         permissionId: p.id,
       })),
     });
+
     console.log(`Assigned ${allPermissions.length} permissions to Admin`);
 
     // Assign specific permissions to Kasir
@@ -228,18 +217,22 @@ async function seed() {
       'transaksi.read',
       'dashboard.read',
     ];
+
     const kasirPermissions = await prisma.permission.findMany({
       where: { code: { in: kasirPermissionCodes } },
     });
+
     await prisma.rolePermission.deleteMany({
       where: { roleId: kasirRole.id },
     });
+
     await prisma.rolePermission.createMany({
       data: kasirPermissions.map((p) => ({
         roleId: kasirRole.id,
         permissionId: p.id,
       })),
     });
+
     console.log(`Assigned ${kasirPermissions.length} permissions to Kasir`);
 
     // Assign specific permissions to Staff
@@ -254,18 +247,22 @@ async function seed() {
       'pinjaman.read',
       'transaksi.read',
     ];
+
     const staffPermissions = await prisma.permission.findMany({
       where: { code: { in: staffPermissionCodes } },
     });
+
     await prisma.rolePermission.deleteMany({
       where: { roleId: staffRole.id },
     });
+
     await prisma.rolePermission.createMany({
       data: staffPermissions.map((p) => ({
         roleId: staffRole.id,
         permissionId: p.id,
       })),
     });
+
     console.log(`Assigned ${staffPermissions.length} permissions to Staff`);
 
     // Assign specific permissions to Pimpinan
@@ -283,18 +280,22 @@ async function seed() {
       'laporan.finalize',
       'dashboard.read',
     ];
+
     const pimpinanPermissions = await prisma.permission.findMany({
       where: { code: { in: pimpinanPermissionCodes } },
     });
+
     await prisma.rolePermission.deleteMany({
       where: { roleId: pimpinanRole.id },
     });
+
     await prisma.rolePermission.createMany({
       data: pimpinanPermissions.map((p) => ({
         roleId: pimpinanRole.id,
         permissionId: p.id,
       })),
     });
+
     console.log(
       `Assigned ${pimpinanPermissions.length} permissions to Pimpinan`,
     );
@@ -317,6 +318,7 @@ async function seed() {
     await prisma.userRole.deleteMany({
       where: { userId: adminUser.id },
     });
+
     await prisma.userRole.create({
       data: {
         userId: adminUser.id,
@@ -356,4 +358,4 @@ async function seed() {
   }
 }
 
-void seed();
+seed();
