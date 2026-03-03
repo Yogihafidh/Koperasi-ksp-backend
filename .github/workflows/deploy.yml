@@ -14,7 +14,7 @@ jobs:
       packages: write
 
     env:
-      IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:${{ github.sha }}
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ksp-api:${{ github.sha }}
 
     steps:
       - name: Checkout code
@@ -36,9 +36,10 @@ jobs:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 146.190.111.184
+          host: ${{ secrets.SSH_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME
           script: |
             docker pull $IMAGE_NAME
             docker stop koperasi_api || true
