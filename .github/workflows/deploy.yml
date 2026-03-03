@@ -14,7 +14,7 @@ jobs:
       packages: write
 
     env:
-      IMAGE_NAME: IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:${{ github.sha }}
+      IMAGE_NAME: ghcr.io/yogihafidh/ksp-api:${{ github.sha }}
 
     steps:
       - name: Checkout code
@@ -40,7 +40,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull ghcr.io/yogihafidh/ksp-api:latest
+            docker pull $IMAGE_NAME
             docker stop koperasi_api || true
             docker rm koperasi_api || true
             docker run -d \
@@ -49,4 +49,4 @@ jobs:
               --env-file /var/www/ksp/.env.production \
               -p 3000:3000 \
               --restart unless-stopped \
-              ghcr.io/yogihafidh/ksp-api:latest
+              $IMAGE_NAME
