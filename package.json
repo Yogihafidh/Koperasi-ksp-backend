@@ -21,7 +21,7 @@
     "test:integration": "jest --config ./test/jest-integration.json --runInBand"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed-auth.ts"
+    "seed": "node prisma/seed-auth.js"
   },
   "dependencies": {
     "@keyv/redis": "^3.0.1",
