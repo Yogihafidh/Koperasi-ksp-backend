@@ -304,7 +304,6 @@ export class PinjamanService {
       tanggal,
       metodePembayaran: dto.metodePembayaran,
       statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
       catatan: dto.catatan,
     });
 
@@ -349,7 +348,6 @@ export class PinjamanService {
       tanggal,
       metodePembayaran: dto.metodePembayaran,
       statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
       catatan: dto.catatan,
     });
 

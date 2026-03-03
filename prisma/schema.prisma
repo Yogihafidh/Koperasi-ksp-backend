@@ -157,7 +157,6 @@ model Transaksi {
   tanggal            DateTime          @db.Timestamptz(3)
   metodePembayaran   String
   statusTransaksi    StatusTransaksi
-  urlBuktiTransaksi  String?
   catatan            String?
   createdAt          DateTime          @default(now()) @db.Timestamptz(3)
   deletedAt          DateTime?         @db.Timestamptz(3)

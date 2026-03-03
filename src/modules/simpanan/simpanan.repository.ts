@@ -72,7 +72,6 @@ export class SimpananRepository {
     tanggal: Date;
     metodePembayaran: string;
     statusTransaksi: StatusTransaksi;
-    urlBuktiTransaksi?: string;
     catatan?: string;
   }) {
     return this.prisma.transaksi.create({

@@ -22,7 +22,6 @@ export class TransaksiRepository {
     tanggal: true,
     metodePembayaran: true,
     statusTransaksi: true,
-    urlBuktiTransaksi: true,
     catatan: true,
     createdAt: true,
     deletedAt: true,
@@ -96,7 +95,6 @@ export class TransaksiRepository {
     tanggal: Date;
     metodePembayaran: string;
     statusTransaksi: StatusTransaksi;
-    urlBuktiTransaksi?: string;
     catatan?: string;
   }) {
     return this.prisma.transaksi.create({

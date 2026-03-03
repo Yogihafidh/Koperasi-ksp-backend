@@ -38,15 +38,6 @@ export class PencairanPinjamanDto {
   tanggal?: string;
 
   @ApiProperty({
-    description: 'URL bukti transaksi (opsional)',
-    example: 'http://localhost:9000/bukti/pencairan-123.png',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  urlBuktiTransaksi?: string;
-
-  @ApiProperty({
     description: 'Catatan transaksi (opsional)',
     example: 'Pencairan pinjaman',
     required: false,

@@ -159,7 +159,6 @@ export class TransaksiService {
       tanggal,
       metodePembayaran: dto.metodePembayaran,
       statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
       catatan: dto.catatan,
     });
 

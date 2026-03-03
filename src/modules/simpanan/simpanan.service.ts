@@ -109,7 +109,6 @@ export class SimpananService {
       tanggal,
       metodePembayaran: dto.metodePembayaran,
       statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
       catatan: dto.catatan,
     });
 
@@ -174,7 +173,6 @@ export class SimpananService {
       tanggal,
       metodePembayaran: dto.metodePembayaran,
       statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
       catatan: dto.catatan,
     });
 
