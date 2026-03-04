@@ -113,38 +113,6 @@ test/
 npm install
 ```
 
-## Environment Variables
-
-Salin file contoh env:
-
-```bash
-cp .env.example .env
-```
-
-Variabel utama yang wajib disesuaikan:
-
-```env
-PORT=3000
-NODE_ENV=development
-API_PREFIX=api
-
-DATABASE_URL=postgresql://user:password@localhost:5432/koperasi
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_password
-POSTGRES_DB=koperasi
-
-REDIS_URL=redis://localhost:6379
-
-JWT_SECRET=your_super_secret_key
-JWT_ACCESS_EXPIRES_IN=30m
-JWT_REFRESH_EXPIRES_IN=7d
-
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-```
-
 ## Running the Project
 
 ### Development
