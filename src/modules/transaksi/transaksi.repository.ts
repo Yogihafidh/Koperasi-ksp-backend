@@ -77,6 +77,15 @@ export class TransaksiRepository {
     });
   }
 
+  findPinjamanByIdOnly(id: number) {
+    return this.prisma.pinjaman.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+      },
+    });
+  }
+
   createTransaksi(data: {
     nasabahId: number;
     pegawaiId: number;

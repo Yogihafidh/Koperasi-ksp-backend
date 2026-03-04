@@ -361,6 +361,13 @@ export class TransaksiService {
   }
 
   async listTransaksiByPinjaman(pinjamanId: number, cursor?: number) {
+    const pinjaman =
+      await this.transaksiRepository.findPinjamanByIdOnly(pinjamanId);
+
+    if (!pinjaman) {
+      throw new NotFoundException('Pinjaman tidak ditemukan');
+    }
+
     const { data, nextCursor } =
       await this.transaksiRepository.listTransaksiByPinjaman({
         pinjamanId,
