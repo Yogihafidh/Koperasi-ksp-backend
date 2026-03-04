@@ -378,26 +378,4 @@ export class TransaksiService {
       },
     };
   }
-
-  async exportTransaksi(args: {
-    jenisTransaksi?: JenisTransaksi;
-    tanggalFrom?: string;
-    tanggalTo?: string;
-  }) {
-    const tanggalFrom = args.tanggalFrom
-      ? new Date(args.tanggalFrom)
-      : undefined;
-    const tanggalTo = args.tanggalTo ? new Date(args.tanggalTo) : undefined;
-
-    const data = await this.transaksiRepository.listTransaksiForExport({
-      jenisTransaksi: args.jenisTransaksi,
-      tanggalFrom,
-      tanggalTo,
-    });
-
-    return {
-      message: 'Berhasil menyiapkan data export transaksi',
-      data,
-    };
-  }
 }

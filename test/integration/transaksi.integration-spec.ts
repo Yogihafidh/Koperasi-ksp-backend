@@ -158,30 +158,4 @@ describe('Transaksi Module (Integration)', () => {
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     });
   });
-
-  describe('GET /api/transaksi/export', () => {
-    it('should export transaksi data', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi/export',
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
-    });
-
-    it('should export with date range filter', async () => {
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const to = now.toISOString();
-
-      const res = await authGet(
-        app,
-        `/api/transaksi/export?tanggalFrom=${from}&tanggalTo=${to}`,
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
-    });
-  });
 });

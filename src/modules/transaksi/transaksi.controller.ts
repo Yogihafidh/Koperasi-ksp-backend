@@ -252,63 +252,6 @@ export class TransaksiController {
     return this.transaksiService.listTransaksiByPegawai(pegawaiId, cursor);
   }
 
-  @Get('export')
-  @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
-  @Permissions('transaksi.read')
-  @ApiOperation({
-    summary: 'Export data transaksi',
-    description:
-      'Mengembalikan data transaksi untuk kebutuhan export. Output masih JSON.',
-  })
-  @ApiQuery({
-    name: 'jenisTransaksi',
-    required: false,
-    enum: JenisTransaksi,
-    description: 'Filter jenis transaksi',
-  })
-  @ApiQuery({
-    name: 'tanggalFrom',
-    required: false,
-    description: 'Filter tanggal mulai (ISO string)',
-  })
-  @ApiQuery({
-    name: 'tanggalTo',
-    required: false,
-    description: 'Filter tanggal akhir (ISO string)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Export transaksi berhasil',
-    content: {
-      'application/json': {
-        example: {
-          message: 'Berhasil menyiapkan data export transaksi',
-          data: [
-            {
-              id: 100,
-              jenisTransaksi: 'SETORAN',
-              nominal: 150000,
-              tanggal: '2026-02-09T10:00:00.000Z',
-            },
-          ],
-        },
-      },
-    },
-  })
-  @ApiAuthErrors()
-  exportTransaksi(
-    @Query('jenisTransaksi') jenisTransaksi?: JenisTransaksi,
-    @Query('tanggalFrom') tanggalFrom?: string,
-    @Query('tanggalTo') tanggalTo?: string,
-  ) {
-    return this.transaksiService.exportTransaksi({
-      jenisTransaksi,
-      tanggalFrom,
-      tanggalTo,
-    });
-  }
-
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
   @Roles('Admin', 'Pimpinan', 'Staff', 'Kasir')

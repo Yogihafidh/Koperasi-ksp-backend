@@ -208,27 +208,4 @@ export class TransaksiRepository {
       where: { pinjamanId: args.pinjamanId },
     });
   }
-
-  listTransaksiForExport(args: {
-    jenisTransaksi?: JenisTransaksi;
-    tanggalFrom?: Date;
-    tanggalTo?: Date;
-  }) {
-    const where: Record<string, unknown> = {};
-    if (args.jenisTransaksi) {
-      where.jenisTransaksi = args.jenisTransaksi;
-    }
-    if (args.tanggalFrom || args.tanggalTo) {
-      where.tanggal = {
-        ...(args.tanggalFrom ? { gte: args.tanggalFrom } : {}),
-        ...(args.tanggalTo ? { lte: args.tanggalTo } : {}),
-      };
-    }
-
-    return this.prisma.transaksi.findMany({
-      where: { deletedAt: null, ...where },
-      select: this.transaksiSummarySelect,
-      orderBy: { id: 'desc' },
-    });
-  }
 }
