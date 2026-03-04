@@ -4,7 +4,6 @@ import {
   PinjamanStatus,
   Prisma,
   PrismaClient,
-  StatusTransaksi,
 } from '@prisma/client';
 
 @Injectable()
@@ -13,17 +12,12 @@ export class DashboardRepository {
 
   private buildTransaksiWhere(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }): Prisma.TransaksiWhereInput {
     const where: Prisma.TransaksiWhereInput = {
       deletedAt: null,
     };
-
-    if (args.statusTransaksi) {
-      where.statusTransaksi = args.statusTransaksi;
-    }
 
     if (args.jenisTransaksi) {
       if (Array.isArray(args.jenisTransaksi)) {
@@ -45,7 +39,6 @@ export class DashboardRepository {
 
   sumTransaksiNominal(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {

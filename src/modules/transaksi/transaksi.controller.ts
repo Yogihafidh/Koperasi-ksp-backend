@@ -17,7 +17,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JenisTransaksi, StatusTransaksi } from '@prisma/client';
+import { JenisTransaksi } from '@prisma/client';
 import { TransaksiService } from './transaksi.service';
 import { CreateTransaksiDto } from './dto';
 import { CurrentUser, Permissions, Roles } from '../../common/decorators';
@@ -44,9 +44,9 @@ export class TransaksiController {
   @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('transaksi.create')
   @ApiOperation({
-    summary: 'Buat transaksi baru (AUTO PROCESS)',
+    summary: 'Buat transaksi baru',
     description:
-      'Mencatat transaksi setelah validasi bisnis lalu langsung diproses hingga APPROVED/REJECTED.',
+      'Mencatat transaksi setelah validasi bisnis, update saldo/pinjaman, lalu menyimpan histori transaksi yang berhasil.',
   })
   @ApiBody({
     description:
@@ -66,7 +66,6 @@ export class TransaksiController {
             pegawaiId: 2,
             rekeningSimpananId: 10,
             jenisTransaksi: 'SETORAN',
-            statusTransaksi: 'APPROVED',
             nominal: 150000,
             metodePembayaran: 'TRANSFER',
             tanggal: '2026-02-09T10:00:00.000Z',
@@ -85,53 +84,6 @@ export class TransaksiController {
     return this.transaksiService.createTransaksi(dto, user.userId);
   }
 
-  @Post(':id/process')
-  @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
-  @Permissions('transaksi.process')
-  @ApiOperation({
-    summary: 'Proses transaksi (APPROVED/REJECTED)',
-    description:
-      'Diproses otomatis oleh backend. Status hanya boleh berubah dari PENDING ke APPROVED/REJECTED.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Transaksi berhasil diproses',
-    content: {
-      'application/json': {
-        example: {
-          message: 'Transaksi berhasil diproses',
-          data: {
-            id: 1,
-            statusTransaksi: 'APPROVED',
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Transaksi ditolak',
-    content: {
-      'application/json': {
-        example: {
-          message: 'Transaksi ditolak',
-          data: {
-            id: 1,
-            statusTransaksi: 'REJECTED',
-            catatan: 'Saldo simpanan tidak mencukupi',
-          },
-        },
-      },
-    },
-  })
-  @ApiBadRequestExample('Transaksi sudah diproses')
-  @ApiNotFoundExample('Transaksi tidak ditemukan')
-  @ApiAuthErrors()
-  processTransaksi(@Param('id', ParseIntPipe) id: number) {
-    return this.transaksiService.processTransaksi(id);
-  }
-
   @Get()
   @ApiBearerAuth('JWT-auth')
   @Roles('Admin', 'Pimpinan')
@@ -139,19 +91,13 @@ export class TransaksiController {
   @ApiOperation({
     summary: 'Dapatkan daftar transaksi',
     description:
-      'Mendukung cursor pagination dan filter status, jenis, serta rentang tanggal.',
+      'Mendukung cursor pagination dan filter jenis serta rentang tanggal.',
   })
   @ApiQuery({
     name: 'cursor',
     required: false,
     description:
       'ID terakhir dari halaman sebelumnya (cursor). Kosongkan untuk halaman pertama.',
-  })
-  @ApiQuery({
-    name: 'statusTransaksi',
-    required: false,
-    enum: StatusTransaksi,
-    description: 'Filter status transaksi',
   })
   @ApiQuery({
     name: 'jenisTransaksi',
@@ -183,7 +129,6 @@ export class TransaksiController {
               pegawaiId: 2,
               rekeningSimpananId: 10,
               jenisTransaksi: 'SETORAN',
-              statusTransaksi: 'APPROVED',
               nominal: 150000,
               tanggal: '2026-02-09T10:00:00.000Z',
               metodePembayaran: 'TRANSFER',
@@ -201,14 +146,12 @@ export class TransaksiController {
   @ApiAuthErrors()
   listTransaksi(
     @Query('cursor', new ParseIntPipe({ optional: true })) cursor?: number,
-    @Query('statusTransaksi') statusTransaksi?: StatusTransaksi,
     @Query('jenisTransaksi') jenisTransaksi?: JenisTransaksi,
     @Query('tanggalFrom') tanggalFrom?: string,
     @Query('tanggalTo') tanggalTo?: string,
   ) {
     return this.transaksiService.listTransaksi({
       cursor,
-      statusTransaksi,
       jenisTransaksi,
       tanggalFrom,
       tanggalTo,
@@ -241,7 +184,6 @@ export class TransaksiController {
               id: 21,
               nasabahId: 1,
               jenisTransaksi: 'PENARIKAN',
-              statusTransaksi: 'APPROVED',
               nominal: 50000,
               tanggal: '2026-02-09T12:00:00.000Z',
             },
@@ -289,7 +231,6 @@ export class TransaksiController {
               id: 30,
               pegawaiId: 2,
               jenisTransaksi: 'SETORAN',
-              statusTransaksi: 'PENDING',
               nominal: 200000,
               tanggal: '2026-02-09T13:00:00.000Z',
             },
@@ -311,51 +252,6 @@ export class TransaksiController {
     return this.transaksiService.listTransaksiByPegawai(pegawaiId, cursor);
   }
 
-  @Get('pending')
-  @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
-  @Permissions('transaksi.read')
-  @ApiOperation({
-    summary: 'Dapatkan transaksi pending',
-    description: 'Daftar transaksi yang belum diproses sistem.',
-  })
-  @ApiQuery({
-    name: 'cursor',
-    required: false,
-    description:
-      'ID terakhir dari halaman sebelumnya (cursor). Kosongkan untuk halaman pertama.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Daftar transaksi pending berhasil diambil',
-    content: {
-      'application/json': {
-        example: {
-          message: 'Berhasil mengambil transaksi pending',
-          data: [
-            {
-              id: 41,
-              statusTransaksi: 'PENDING',
-              jenisTransaksi: 'ANGSURAN',
-              nominal: 300000,
-            },
-          ],
-          pagination: {
-            nextCursor: null,
-            limit: 20,
-            hasNext: false,
-          },
-        },
-      },
-    },
-  })
-  @ApiAuthErrors()
-  listTransaksiPending(
-    @Query('cursor', new ParseIntPipe({ optional: true })) cursor?: number,
-  ) {
-    return this.transaksiService.listTransaksiPending(cursor);
-  }
-
   @Get('export')
   @ApiBearerAuth('JWT-auth')
   @Roles('Admin', 'Pimpinan')
@@ -364,12 +260,6 @@ export class TransaksiController {
     summary: 'Export data transaksi',
     description:
       'Mengembalikan data transaksi untuk kebutuhan export. Output masih JSON.',
-  })
-  @ApiQuery({
-    name: 'statusTransaksi',
-    required: false,
-    enum: StatusTransaksi,
-    description: 'Filter status transaksi',
   })
   @ApiQuery({
     name: 'jenisTransaksi',
@@ -398,7 +288,6 @@ export class TransaksiController {
             {
               id: 100,
               jenisTransaksi: 'SETORAN',
-              statusTransaksi: 'APPROVED',
               nominal: 150000,
               tanggal: '2026-02-09T10:00:00.000Z',
             },
@@ -409,13 +298,11 @@ export class TransaksiController {
   })
   @ApiAuthErrors()
   exportTransaksi(
-    @Query('statusTransaksi') statusTransaksi?: StatusTransaksi,
     @Query('jenisTransaksi') jenisTransaksi?: JenisTransaksi,
     @Query('tanggalFrom') tanggalFrom?: string,
     @Query('tanggalTo') tanggalTo?: string,
   ) {
     return this.transaksiService.exportTransaksi({
-      statusTransaksi,
       jenisTransaksi,
       tanggalFrom,
       tanggalTo,
@@ -443,7 +330,6 @@ export class TransaksiController {
             nasabahId: 1,
             pegawaiId: 2,
             jenisTransaksi: 'SETORAN',
-            statusTransaksi: 'APPROVED',
             nominal: 150000,
             tanggal: '2026-02-09T10:00:00.000Z',
             metodePembayaran: 'TRANSFER',

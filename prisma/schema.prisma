@@ -156,7 +156,6 @@ model Transaksi {
   nominal            Decimal
   tanggal            DateTime          @db.Timestamptz(3)
   metodePembayaran   String
-  statusTransaksi    StatusTransaksi
   catatan            String?
   createdAt          DateTime          @default(now()) @db.Timestamptz(3)
   deletedAt          DateTime?         @db.Timestamptz(3)
@@ -170,7 +169,7 @@ model Transaksi {
   @@index([rekeningSimpananId])
   @@index([pinjamanId])
   @@index([tanggal])
-  @@index([statusTransaksi, jenisTransaksi, tanggal])
+  @@index([jenisTransaksi, tanggal])
 }
 
 model AuditTrail {
@@ -253,12 +252,6 @@ enum JenisTransaksi {
   PENARIKAN
   PENCAIRAN
   ANGSURAN
-}
-
-enum StatusTransaksi {
-  PENDING
-  APPROVED
-  REJECTED
 }
 
 enum AuditAction {

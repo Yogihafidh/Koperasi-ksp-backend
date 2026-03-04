@@ -8,7 +8,7 @@ import {
   NasabahStatus,
   PinjamanStatus,
   Prisma,
-  StatusTransaksi,
+  PrismaClient,
 } from '@prisma/client';
 import { TransaksiRepository } from './transaksi.repository';
 import { CreateTransaksiDto } from './dto';
@@ -21,6 +21,7 @@ export class TransaksiService {
   constructor(
     private readonly transaksiRepository: TransaksiRepository,
     private readonly settingsService: SettingsService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   private toDecimal(value: number) {
@@ -73,36 +74,66 @@ export class TransaksiService {
       );
     }
 
-    if (requiresRekening) {
-      const rekening = await this.transaksiRepository.findRekeningSimpananById(
-        dto.rekeningSimpananId as number,
-        dto.nasabahId,
-      );
-      if (!rekening) {
-        throw new NotFoundException('Rekening simpanan tidak ditemukan');
-      }
-
-      if (dto.jenisTransaksi === JenisTransaksi.PENARIKAN) {
-        if (rekening.saldoBerjalan.lessThan(this.toDecimal(dto.nominal))) {
-          throw new BadRequestException('Saldo simpanan tidak mencukupi');
-        }
-      }
+    const nominal = this.toDecimal(dto.nominal);
+    const rekening = requiresRekening
+      ? await this.transaksiRepository.findRekeningSimpananById(
+          dto.rekeningSimpananId as number,
+          dto.nasabahId,
+        )
+      : null;
+    if (requiresRekening && !rekening) {
+      throw new NotFoundException('Rekening simpanan tidak ditemukan');
     }
 
-    if (requiresPinjaman) {
-      const pinjaman = await this.transaksiRepository.findPinjamanById(
-        dto.pinjamanId as number,
-        dto.nasabahId,
-      );
-      if (!pinjaman) {
-        throw new NotFoundException('Pinjaman tidak ditemukan');
-      }
+    const pinjaman = requiresPinjaman
+      ? await this.transaksiRepository.findPinjamanById(
+          dto.pinjamanId as number,
+          dto.nasabahId,
+        )
+      : null;
+    if (requiresPinjaman && !pinjaman) {
+      throw new NotFoundException('Pinjaman tidak ditemukan');
+    }
 
+    let updateRekening:
+      | {
+          id: number;
+          saldoBerjalan: Prisma.Decimal;
+        }
+      | undefined;
+    if (rekening) {
+      const saldoBerjalan = rekening.saldoBerjalan;
+      const saldoBaru =
+        dto.jenisTransaksi === JenisTransaksi.SETORAN
+          ? saldoBerjalan.plus(nominal)
+          : (() => {
+              if (saldoBerjalan.lessThan(nominal)) {
+                throw new BadRequestException('Saldo simpanan tidak mencukupi');
+              }
+              return saldoBerjalan.minus(nominal);
+            })();
+
+      updateRekening = {
+        id: rekening.id,
+        saldoBerjalan: saldoBaru,
+      };
+    }
+
+    let updatePinjaman:
+      | {
+          id: number;
+          sisaPinjaman: Prisma.Decimal;
+          status?: PinjamanStatus;
+        }
+      | undefined;
+    if (pinjaman) {
       if (pinjaman.status !== PinjamanStatus.DISETUJUI) {
         throw new BadRequestException('Pinjaman belum disetujui');
       }
 
-      const nominal = this.toDecimal(dto.nominal);
+      let sisaBaru = pinjaman.sisaPinjaman;
+      let statusPinjaman: PinjamanStatus | undefined;
+
       if (dto.jenisTransaksi === JenisTransaksi.PENCAIRAN) {
         if (pinjaman.sisaPinjaman.greaterThan(this.toDecimal(0))) {
           throw new BadRequestException('Pencairan pinjaman sudah dibuat');
@@ -110,9 +141,22 @@ export class TransaksiService {
         if (!nominal.equals(pinjaman.jumlahPinjaman)) {
           throw new BadRequestException('Pencairan anda tidak sesuai');
         }
-      } else if (pinjaman.sisaPinjaman.lessThan(nominal)) {
-        throw new BadRequestException('Nominal melebihi sisa pinjaman');
+        sisaBaru = pinjaman.jumlahPinjaman;
+      } else {
+        if (pinjaman.sisaPinjaman.lessThan(nominal)) {
+          throw new BadRequestException('Nominal melebihi sisa pinjaman');
+        }
+        sisaBaru = pinjaman.sisaPinjaman.minus(nominal);
+        if (sisaBaru.lessThanOrEqualTo(this.toDecimal(0))) {
+          statusPinjaman = PinjamanStatus.LUNAS;
+        }
       }
+
+      updatePinjaman = {
+        id: pinjaman.id,
+        sisaPinjaman: sisaBaru,
+        status: statusPinjaman,
+      };
     }
 
     const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
@@ -149,151 +193,57 @@ export class TransaksiService {
       );
     }
 
-    const transaksi = await this.transaksiRepository.createTransaksi({
-      nasabahId: dto.nasabahId,
-      pegawaiId: pegawai.id,
-      rekeningSimpananId: dto.rekeningSimpananId,
-      pinjamanId: dto.pinjamanId,
-      jenisTransaksi: dto.jenisTransaksi,
-      nominal: dto.nominal,
-      tanggal,
-      metodePembayaran: dto.metodePembayaran,
-      statusTransaksi: StatusTransaksi.PENDING,
-      catatan: dto.catatan,
+    const transaksi = await this.prisma.$transaction(async (tx) => {
+      if (updateRekening) {
+        await tx.rekeningSimpanan.update({
+          where: { id: updateRekening.id },
+          data: { saldoBerjalan: updateRekening.saldoBerjalan },
+        });
+      }
+
+      if (updatePinjaman) {
+        await tx.pinjaman.update({
+          where: { id: updatePinjaman.id },
+          data: {
+            sisaPinjaman: updatePinjaman.sisaPinjaman,
+            ...(updatePinjaman.status ? { status: updatePinjaman.status } : {}),
+          },
+        });
+      }
+
+      return tx.transaksi.create({
+        data: {
+          nasabahId: dto.nasabahId,
+          pegawaiId: pegawai.id,
+          rekeningSimpananId: dto.rekeningSimpananId,
+          pinjamanId: dto.pinjamanId,
+          jenisTransaksi: dto.jenisTransaksi,
+          nominal: dto.nominal,
+          tanggal,
+          metodePembayaran: dto.metodePembayaran,
+          catatan: dto.catatan,
+        },
+        select: {
+          id: true,
+          nasabahId: true,
+          pegawaiId: true,
+          rekeningSimpananId: true,
+          pinjamanId: true,
+          jenisTransaksi: true,
+          nominal: true,
+          tanggal: true,
+          metodePembayaran: true,
+          catatan: true,
+          createdAt: true,
+          deletedAt: true,
+        },
+      });
     });
 
-    return this.processTransaksi(transaksi.id);
-  }
-
-  async processTransaksi(id: number) {
-    const transaksi = await this.transaksiRepository.findTransaksiById(id);
-    if (!transaksi) {
-      throw new NotFoundException('Transaksi tidak ditemukan');
-    }
-
-    if (transaksi.statusTransaksi !== StatusTransaksi.PENDING) {
-      throw new BadRequestException('Transaksi sudah diproses');
-    }
-
-    if (transaksi.nasabah.status !== NasabahStatus.AKTIF) {
-      const rejected = await this.transaksiRepository.applyTransaksi({
-        transaksiId: transaksi.id,
-        statusTransaksi: StatusTransaksi.REJECTED,
-        catatan: 'Nasabah tidak aktif',
-      });
-
-      return {
-        message: 'Transaksi ditolak',
-        data: rejected,
-      };
-    }
-
-    const nominal = this.toDecimal(Number(transaksi.nominal));
-
-    try {
-      if (
-        transaksi.jenisTransaksi === JenisTransaksi.SETORAN ||
-        transaksi.jenisTransaksi === JenisTransaksi.PENARIKAN
-      ) {
-        if (!transaksi.rekeningSimpanan) {
-          throw new BadRequestException('Rekening simpanan tidak ditemukan');
-        }
-
-        const saldoBerjalan = transaksi.rekeningSimpanan.saldoBerjalan;
-        const saldoBaru =
-          transaksi.jenisTransaksi === JenisTransaksi.SETORAN
-            ? saldoBerjalan.plus(nominal)
-            : (() => {
-                if (saldoBerjalan.lessThan(nominal)) {
-                  throw new BadRequestException(
-                    'Saldo simpanan tidak mencukupi',
-                  );
-                }
-                return saldoBerjalan.minus(nominal);
-              })();
-
-        const updated = await this.transaksiRepository.applyTransaksi({
-          transaksiId: transaksi.id,
-          statusTransaksi: StatusTransaksi.APPROVED,
-          updateRekening: {
-            id: transaksi.rekeningSimpanan.id,
-            saldoBerjalan: saldoBaru,
-          },
-        });
-
-        return {
-          message: 'Transaksi berhasil diproses',
-          data: updated,
-        };
-      }
-
-      if (
-        transaksi.jenisTransaksi === JenisTransaksi.PENCAIRAN ||
-        transaksi.jenisTransaksi === JenisTransaksi.ANGSURAN
-      ) {
-        if (!transaksi.pinjaman) {
-          throw new BadRequestException('Pinjaman tidak ditemukan');
-        }
-
-        if (transaksi.pinjaman.status !== PinjamanStatus.DISETUJUI) {
-          throw new BadRequestException('Pinjaman belum disetujui');
-        }
-
-        const sisaPinjaman = transaksi.pinjaman.sisaPinjaman;
-        let sisaBaru = sisaPinjaman;
-        let statusPinjaman: PinjamanStatus | undefined;
-
-        if (transaksi.jenisTransaksi === JenisTransaksi.PENCAIRAN) {
-          const jumlahPinjaman = transaksi.pinjaman.jumlahPinjaman;
-          if (sisaPinjaman.greaterThan(this.toDecimal(0))) {
-            throw new BadRequestException('Pencairan pinjaman sudah dibuat');
-          }
-          if (!nominal.equals(jumlahPinjaman)) {
-            throw new BadRequestException('Pencairan anda tidak sesuai');
-          }
-          sisaBaru = jumlahPinjaman;
-        } else {
-          if (sisaPinjaman.lessThan(nominal)) {
-            throw new BadRequestException('Nominal melebihi sisa pinjaman');
-          }
-          sisaBaru = sisaPinjaman.minus(nominal);
-          if (sisaBaru.lessThanOrEqualTo(this.toDecimal(0))) {
-            statusPinjaman = PinjamanStatus.LUNAS;
-          }
-        }
-
-        const updated = await this.transaksiRepository.applyTransaksi({
-          transaksiId: transaksi.id,
-          statusTransaksi: StatusTransaksi.APPROVED,
-          updatePinjaman: {
-            id: transaksi.pinjaman.id,
-            sisaPinjaman: sisaBaru,
-            status: statusPinjaman,
-          },
-        });
-
-        return {
-          message: 'Transaksi berhasil diproses',
-          data: updated,
-        };
-      }
-
-      throw new BadRequestException('Jenis transaksi tidak dikenali');
-    } catch (error) {
-      const reason =
-        error instanceof Error ? error.message : 'Proses transaksi gagal';
-
-      const rejected = await this.transaksiRepository.applyTransaksi({
-        transaksiId: transaksi.id,
-        statusTransaksi: StatusTransaksi.REJECTED,
-        catatan: reason,
-      });
-
-      return {
-        message: 'Transaksi ditolak',
-        data: rejected,
-      };
-    }
+    return {
+      message: 'Transaksi berhasil diproses',
+      data: transaksi,
+    };
   }
 
   async getTransaksiById(id: number) {
@@ -325,7 +275,6 @@ export class TransaksiService {
 
   async listTransaksi(args: {
     cursor?: number;
-    statusTransaksi?: StatusTransaksi;
     jenisTransaksi?: JenisTransaksi;
     tanggalFrom?: string;
     tanggalTo?: string;
@@ -338,7 +287,6 @@ export class TransaksiService {
     const { data, nextCursor } = await this.transaksiRepository.listTransaksi({
       cursor: args.cursor,
       take: DEFAULT_PAGE_SIZE,
-      statusTransaksi: args.statusTransaksi,
       jenisTransaksi: args.jenisTransaksi,
       tanggalFrom,
       tanggalTo,
@@ -393,24 +341,6 @@ export class TransaksiService {
     };
   }
 
-  async listTransaksiPending(cursor?: number) {
-    const { data, nextCursor } =
-      await this.transaksiRepository.listTransaksiPending({
-        cursor,
-        take: DEFAULT_PAGE_SIZE,
-      });
-
-    return {
-      message: 'Berhasil mengambil transaksi pending',
-      data,
-      pagination: {
-        nextCursor,
-        limit: DEFAULT_PAGE_SIZE,
-        hasNext: nextCursor !== null,
-      },
-    };
-  }
-
   async listTransaksiByRekening(rekeningSimpananId: number, cursor?: number) {
     const { data, nextCursor } =
       await this.transaksiRepository.listTransaksiByRekening({
@@ -450,7 +380,6 @@ export class TransaksiService {
   }
 
   async exportTransaksi(args: {
-    statusTransaksi?: StatusTransaksi;
     jenisTransaksi?: JenisTransaksi;
     tanggalFrom?: string;
     tanggalTo?: string;
@@ -461,7 +390,6 @@ export class TransaksiService {
     const tanggalTo = args.tanggalTo ? new Date(args.tanggalTo) : undefined;
 
     const data = await this.transaksiRepository.listTransaksiForExport({
-      statusTransaksi: args.statusTransaksi,
       jenisTransaksi: args.jenisTransaksi,
       tanggalFrom,
       tanggalTo,

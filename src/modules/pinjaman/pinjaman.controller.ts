@@ -153,7 +153,7 @@ export class PinjamanController {
   @Roles('Admin', 'Kasir')
   @Permissions('pinjaman.cairkan')
   @ApiOperation({
-    summary: 'Catat pencairan pinjaman (AUTO PROCESS)',
+    summary: 'Catat pencairan pinjaman',
     description:
       'Transaksi pencairan langsung diproses oleh backend hingga APPROVED/REJECTED.',
   })
@@ -178,7 +178,7 @@ export class PinjamanController {
   @Roles('Admin', 'Kasir')
   @Permissions('pinjaman.angsuran')
   @ApiOperation({
-    summary: 'Catat angsuran pinjaman (AUTO PROCESS)',
+    summary: 'Catat angsuran pinjaman',
     description:
       'Transaksi angsuran langsung diproses oleh backend hingga APPROVED/REJECTED.',
   })

@@ -7,7 +7,6 @@ import {
   Prisma,
   PrismaClient,
   StatusLaporan,
-  StatusTransaksi,
 } from '@prisma/client';
 
 @Injectable()
@@ -16,17 +15,12 @@ export class LaporanRepository {
 
   private buildTransaksiWhere(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }): Prisma.TransaksiWhereInput {
     const where: Prisma.TransaksiWhereInput = {
       deletedAt: null,
     };
-
-    if (args.statusTransaksi) {
-      where.statusTransaksi = args.statusTransaksi;
-    }
 
     if (args.jenisTransaksi) {
       if (Array.isArray(args.jenisTransaksi)) {
@@ -48,7 +42,6 @@ export class LaporanRepository {
 
   sumTransaksiNominal(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
@@ -62,7 +55,6 @@ export class LaporanRepository {
 
   countTransaksi(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
@@ -72,11 +64,7 @@ export class LaporanRepository {
     });
   }
 
-  groupTransaksiByJenis(args: {
-    statusTransaksi?: StatusTransaksi;
-    tanggalFrom?: Date;
-    tanggalTo?: Date;
-  }) {
+  groupTransaksiByJenis(args: { tanggalFrom?: Date; tanggalTo?: Date }) {
     return this.prisma.transaksi.groupBy({
       by: ['jenisTransaksi'],
       where: this.buildTransaksiWhere(args),
@@ -86,17 +74,10 @@ export class LaporanRepository {
   }
 
   async getTransaksiSummaryByJenis(args: {
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
     const conditions: Prisma.Sql[] = [Prisma.sql`"deletedAt" IS NULL`];
-
-    if (args.statusTransaksi) {
-      conditions.push(
-        Prisma.sql`"statusTransaksi" = ${args.statusTransaksi}::"StatusTransaksi"`,
-      );
-    }
 
     if (args.tanggalFrom) {
       conditions.push(Prisma.sql`"tanggal" >= ${args.tanggalFrom}`);
@@ -175,7 +156,6 @@ export class LaporanRepository {
           ) AS pengeluaran
         FROM "Transaksi"
         WHERE "deletedAt" IS NULL
-          AND "statusTransaksi" = ${StatusTransaksi.APPROVED}::"StatusTransaksi"
           AND "tanggal" >= ${args.tanggalFrom}
           AND "tanggal" <= ${args.tanggalTo}
         GROUP BY tahun, bulan
@@ -183,21 +163,8 @@ export class LaporanRepository {
     );
   }
 
-  groupTransaksiByStatus(args: {
-    jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    tanggalFrom?: Date;
-    tanggalTo?: Date;
-  }) {
-    return this.prisma.transaksi.groupBy({
-      by: ['statusTransaksi'],
-      where: this.buildTransaksiWhere(args),
-      _count: { _all: true },
-    });
-  }
-
   topNasabahByTransaksi(args: {
     jenisTransaksi: JenisTransaksi;
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
     take?: number;
@@ -206,7 +173,6 @@ export class LaporanRepository {
       by: ['nasabahId'],
       where: this.buildTransaksiWhere({
         jenisTransaksi: args.jenisTransaksi,
-        statusTransaksi: args.statusTransaksi,
         tanggalFrom: args.tanggalFrom,
         tanggalTo: args.tanggalTo,
       }),
@@ -220,7 +186,6 @@ export class LaporanRepository {
 
   topNasabahByNominal(args: {
     jenisTransaksi: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
     take?: number;
@@ -229,7 +194,6 @@ export class LaporanRepository {
       by: ['nasabahId'],
       where: this.buildTransaksiWhere({
         jenisTransaksi: args.jenisTransaksi,
-        statusTransaksi: args.statusTransaksi,
         tanggalFrom: args.tanggalFrom,
         tanggalTo: args.tanggalTo,
       }),
@@ -339,7 +303,6 @@ export class LaporanRepository {
       where: {
         deletedAt: null,
         jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggal: {
           gte: args.tanggalFrom,
           lte: args.tanggalTo,
@@ -357,17 +320,10 @@ export class LaporanRepository {
 
   async countDistinctNasabahTransaksi(args: {
     jenisTransaksi?: JenisTransaksi | JenisTransaksi[];
-    statusTransaksi?: StatusTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
     const conditions: Prisma.Sql[] = [Prisma.sql`"deletedAt" IS NULL`];
-
-    if (args.statusTransaksi) {
-      conditions.push(
-        Prisma.sql`"statusTransaksi" = ${args.statusTransaksi}::"StatusTransaksi"`,
-      );
-    }
 
     if (args.jenisTransaksi) {
       const jenisList = Array.isArray(args.jenisTransaksi)
@@ -438,7 +394,6 @@ export class LaporanRepository {
           none: {
             deletedAt: null,
             jenisTransaksi: JenisTransaksi.SETORAN,
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggal: {
               gte: args.tanggalFrom,
               lte: args.tanggalTo,
@@ -478,7 +433,6 @@ export class LaporanRepository {
           SELECT "nasabahId", MAX("tanggal") AS last_trx
           FROM "Transaksi"
           WHERE "deletedAt" IS NULL
-            AND "statusTransaksi" = ${StatusTransaksi.APPROVED}
           GROUP BY "nasabahId"
         ) t ON t."nasabahId" = n."id"
         WHERE n."deletedAt" IS NULL

@@ -6,7 +6,6 @@ import {
   NasabahStatus,
   Prisma,
   StatusLaporan,
-  StatusTransaksi,
 } from '@prisma/client';
 import { LaporanRepository } from './laporan.repository';
 import { CacheService } from '../../common/cache/cache.service';
@@ -338,14 +337,12 @@ export class LaporanService {
           snapshotCurrent
             ? Promise.resolve(null)
             : this.laporanRepository.groupTransaksiByJenis({
-                statusTransaksi: StatusTransaksi.APPROVED,
                 tanggalFrom: start,
                 tanggalTo: end,
               }),
           snapshotPrev
             ? Promise.resolve(null)
             : this.laporanRepository.groupTransaksiByJenis({
-                statusTransaksi: StatusTransaksi.APPROVED,
                 tanggalFrom: prevRange.start,
                 tanggalTo: prevRange.end,
               }),
@@ -375,7 +372,6 @@ export class LaporanService {
           }),
           this.getSaldoAwal(bulan, tahun),
           this.laporanRepository.countTransaksi({
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
           }),
@@ -392,13 +388,11 @@ export class LaporanService {
           snapshotCurrent
             ? this.laporanRepository.sumTransaksiNominal({
                 jenisTransaksi: JenisTransaksi.PENCAIRAN,
-                statusTransaksi: StatusTransaksi.APPROVED,
                 tanggalFrom: start,
                 tanggalTo: end,
               })
             : Promise.resolve(null),
           this.laporanRepository.countTransaksi({
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: prevRange.start,
             tanggalTo: prevRange.end,
           }),
@@ -560,7 +554,6 @@ export class LaporanService {
         const allJenis = Object.values(JenisTransaksi) as JenisTransaksi[];
         const grouped = await this.laporanRepository.getTransaksiSummaryByJenis(
           {
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
           },
@@ -618,13 +611,11 @@ export class LaporanService {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const totalAgg = await this.laporanRepository.sumTransaksiNominal({
           jenisTransaksi: JenisTransaksi.ANGSURAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: start,
           tanggalTo: end,
         });
         const countAgg = await this.laporanRepository.countTransaksi({
           jenisTransaksi: JenisTransaksi.ANGSURAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: start,
           tanggalTo: end,
         });
@@ -633,14 +624,12 @@ export class LaporanService {
         const totalPencairanAgg =
           await this.laporanRepository.sumTransaksiNominal({
             jenisTransaksi: JenisTransaksi.PENCAIRAN,
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
           });
         const jumlahPeminjam =
           await this.laporanRepository.countDistinctNasabahTransaksi({
             jenisTransaksi: JenisTransaksi.ANGSURAN,
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
           });
@@ -702,7 +691,6 @@ export class LaporanService {
         const { start, end } = this.getMonthRange(bulan, tahun);
         const totalAgg = await this.laporanRepository.sumTransaksiNominal({
           jenisTransaksi: JenisTransaksi.PENARIKAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: start,
           tanggalTo: end,
         });
@@ -716,7 +704,6 @@ export class LaporanService {
         const topNasabahNominal =
           await this.laporanRepository.topNasabahByNominal({
             jenisTransaksi: JenisTransaksi.PENARIKAN,
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
             take: 3,
@@ -742,7 +729,6 @@ export class LaporanService {
         );
         const prevAgg = await this.laporanRepository.sumTransaksiNominal({
           jenisTransaksi: JenisTransaksi.PENARIKAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: prevStart,
           tanggalTo: prevEnd,
         });
@@ -855,13 +841,11 @@ export class LaporanService {
           await this.laporanRepository.sumSaldoSimpanan();
         const setoranAgg = await this.laporanRepository.sumTransaksiNominal({
           jenisTransaksi: JenisTransaksi.SETORAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: start,
           tanggalTo: end,
         });
         const penarikanAgg = await this.laporanRepository.sumTransaksiNominal({
           jenisTransaksi: JenisTransaksi.PENARIKAN,
-          statusTransaksi: StatusTransaksi.APPROVED,
           tanggalFrom: start,
           tanggalTo: end,
         });
@@ -1046,7 +1030,6 @@ export class LaporanService {
           this.laporanRepository.sumPinjamanAktifNominal(),
           this.laporanRepository.countDistinctNasabahTransaksi({
             jenisTransaksi: Object.values(JenisTransaksi) as JenisTransaksi[],
-            statusTransaksi: StatusTransaksi.APPROVED,
             tanggalFrom: start,
             tanggalTo: end,
           }),
@@ -1114,25 +1097,21 @@ export class LaporanService {
     ] = await Promise.all([
       this.laporanRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.SETORAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
       this.laporanRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.PENARIKAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
       this.laporanRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
       this.laporanRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.PENCAIRAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),

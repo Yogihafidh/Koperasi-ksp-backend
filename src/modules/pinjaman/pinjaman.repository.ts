@@ -4,7 +4,6 @@ import {
   PinjamanStatus,
   Prisma,
   PrismaClient,
-  StatusTransaksi,
 } from '@prisma/client';
 
 @Injectable()
@@ -137,31 +136,10 @@ export class PinjamanRepository {
       where: {
         pinjamanId,
         jenisTransaksi: JenisTransaksi.PENCAIRAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
+        deletedAt: null,
       },
       _sum: {
         nominal: true,
-      },
-    });
-  }
-
-  createTransaksi(args: {
-    nasabahId: number;
-    pegawaiId: number;
-    pinjamanId: number;
-    jenisTransaksi: JenisTransaksi;
-    nominal: number;
-    tanggal: Date;
-    metodePembayaran: string;
-    statusTransaksi: StatusTransaksi;
-    catatan?: string;
-  }) {
-    return this.prisma.transaksi.create({
-      data: args,
-      include: {
-        nasabah: true,
-        pegawai: true,
-        pinjaman: true,
       },
     });
   }

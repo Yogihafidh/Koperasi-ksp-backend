@@ -73,7 +73,7 @@ export class SimpananController {
   @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('simpanan.setor')
   @ApiOperation({
-    summary: 'Catat setoran simpanan (AUTO PROCESS)',
+    summary: 'Catat setoran simpanan',
     description:
       'Transaksi setoran langsung diproses oleh backend hingga APPROVED/REJECTED.',
   })
@@ -98,7 +98,7 @@ export class SimpananController {
   @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('simpanan.tarik')
   @ApiOperation({
-    summary: 'Catat penarikan simpanan (AUTO PROCESS)',
+    summary: 'Catat penarikan simpanan',
     description:
       'Transaksi penarikan langsung diproses oleh backend hingga APPROVED/REJECTED.',
   })

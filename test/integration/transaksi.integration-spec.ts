@@ -102,18 +102,6 @@ describe('Transaksi Module (Integration)', () => {
         expect(trx.jenisTransaksi).toBe('SETORAN');
       }
     });
-
-    it('should filter by statusTransaksi', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi?statusTransaksi=APPROVED',
-        adminToken,
-      ).expect(200);
-
-      for (const trx of res.body.data) {
-        expect(trx.statusTransaksi).toBe('APPROVED');
-      }
-    });
   });
 
   describe('GET /api/transaksi/:id', () => {
@@ -126,7 +114,6 @@ describe('Transaksi Module (Integration)', () => {
 
       expect(res.body.data.id).toBe(createdTransaksiId);
       expect(res.body.data).toHaveProperty('jenisTransaksi');
-      expect(res.body.data).toHaveProperty('statusTransaksi');
       expect(res.body.data).toHaveProperty('nominal');
     });
   });
@@ -169,18 +156,6 @@ describe('Transaksi Module (Integration)', () => {
 
       expect(res.body.data).toBeInstanceOf(Array);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe('GET /api/transaksi/pending', () => {
-    it('should list pending transaksi', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi/pending',
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
     });
   });
 

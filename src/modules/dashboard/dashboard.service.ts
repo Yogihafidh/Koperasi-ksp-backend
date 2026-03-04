@@ -5,7 +5,6 @@ import {
   JenisTransaksi,
   NasabahStatus,
   Prisma,
-  StatusTransaksi,
 } from '@prisma/client';
 import { DashboardRepository } from './dashboard.repository';
 import { SettingsService } from '../settings/settings.service';
@@ -107,19 +106,16 @@ export class DashboardService {
       this.dashboardRepository.sumPinjamanAktifNominal(),
       this.dashboardRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.SETORAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
       this.dashboardRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.PENARIKAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
       this.dashboardRepository.sumTransaksiNominal({
         jenisTransaksi: JenisTransaksi.ANGSURAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
         tanggalFrom: start,
         tanggalTo: end,
       }),
@@ -179,7 +175,6 @@ export class DashboardService {
           const [kasMasukAgg, kasKeluarAgg] = await Promise.all([
             this.dashboardRepository.sumTransaksiNominal({
               jenisTransaksi: [JenisTransaksi.SETORAN, JenisTransaksi.ANGSURAN],
-              statusTransaksi: StatusTransaksi.APPROVED,
               tanggalFrom: item.range.start,
               tanggalTo: item.range.end,
             }),
@@ -188,7 +183,6 @@ export class DashboardService {
                 JenisTransaksi.PENARIKAN,
                 JenisTransaksi.PENCAIRAN,
               ],
-              statusTransaksi: StatusTransaksi.APPROVED,
               tanggalFrom: item.range.start,
               tanggalTo: item.range.end,
             }),
