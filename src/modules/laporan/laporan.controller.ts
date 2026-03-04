@@ -72,13 +72,6 @@ export class LaporanController {
               rasioCashCoverage: 1.3,
               rasioKeaktifanAnggota: 0.8,
             },
-            riskEvaluation: {
-              likuiditas: 'AMAN',
-              ekspansiKredit: 'OPTIMAL',
-              arusKas: 'POSITIF',
-              ketahananKas: 'CUKUP',
-              aktivitasAnggota: 'STABIL',
-            },
           },
         },
       },

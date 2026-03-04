@@ -131,71 +131,6 @@ export class LaporanService {
     return 'STABIL';
   }
 
-  private getLikuiditasRisk(value: number | null) {
-    if (value === null) {
-      return 'N/A';
-    }
-    if (value > 2) {
-      return 'AMAN';
-    }
-    if (value >= 1) {
-      return 'WASPADA';
-    }
-    return 'RISIKO';
-  }
-
-  private getEkspansiKreditRisk(value: number | null) {
-    if (value === null) {
-      return 'N/A';
-    }
-    if (value < 0.75) {
-      return 'KURANG PRODUKTIF';
-    }
-    if (value <= 0.85) {
-      return 'OPTIMAL';
-    }
-    if (value <= 0.95) {
-      return 'WASPADA';
-    }
-    return 'RISIKO';
-  }
-
-  private getArusKasRisk(netCashflow: number) {
-    if (netCashflow > 0) {
-      return 'POSITIF';
-    }
-    if (netCashflow === 0) {
-      return 'NETRAL';
-    }
-    return 'NEGATIF';
-  }
-
-  private getKetahananKasRisk(value: number | null) {
-    if (value === null) {
-      return 'N/A';
-    }
-    if (value < 1) {
-      return 'RISIKO';
-    }
-    if (value < 1.5) {
-      return 'CUKUP';
-    }
-    return 'KUAT';
-  }
-
-  private getAktivitasAnggotaRisk(rasioKeaktifan: number | null) {
-    if (rasioKeaktifan === null) {
-      return 'N/A';
-    }
-    if (rasioKeaktifan < 0.5) {
-      return 'RENDAH';
-    }
-    if (rasioKeaktifan < 0.75) {
-      return 'MENURUN';
-    }
-    return 'STABIL';
-  }
-
   private buildRatioKpi(value: number | null, status: string) {
     return { value, status };
   }
@@ -502,14 +437,6 @@ export class LaporanService {
         const rasioKeaktifan = this.safeDivide(anggotaAktif, totalAnggota);
         const rasioKeaktifanAnggota = rasioKeaktifan;
 
-        const riskEvaluation = {
-          likuiditas: this.getLikuiditasRisk(rasioLikuiditas),
-          ekspansiKredit: this.getEkspansiKreditRisk(rasioKreditAktif),
-          arusKas: this.getArusKasRisk(netCashflow),
-          ketahananKas: this.getKetahananKasRisk(rasioCashCoverage),
-          aktivitasAnggota: this.getAktivitasAnggotaRisk(rasioKeaktifanAnggota),
-        };
-
         return {
           message: 'Berhasil mengambil laporan bulanan',
           data: {
@@ -539,7 +466,6 @@ export class LaporanService {
               rasioCashCoverage,
               rasioKeaktifanAnggota,
             },
-            riskEvaluation,
           },
         };
       },
