@@ -56,7 +56,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/testdb
 
       - name: Run Integration Test
-        run: npm run test:e2e
+        run: npm run test:integration
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/testdb
           REDIS_URL: redis://localhost:6379
