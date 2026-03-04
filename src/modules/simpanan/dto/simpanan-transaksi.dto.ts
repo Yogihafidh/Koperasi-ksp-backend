@@ -36,15 +36,6 @@ export class SimpananTransaksiDto {
   tanggal?: string;
 
   @ApiProperty({
-    description: 'URL bukti transaksi (opsional)',
-    example: 'http://localhost:9000/bukti/setoran-123.png',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  urlBuktiTransaksi?: string;
-
-  @ApiProperty({
     description: 'Catatan transaksi (opsional)',
     example: 'Setoran simpanan wajib',
     required: false,

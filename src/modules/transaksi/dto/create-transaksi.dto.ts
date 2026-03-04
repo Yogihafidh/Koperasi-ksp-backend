@@ -3,7 +3,6 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -75,15 +74,6 @@ export class CreateTransaksiDto {
   })
   @IsEnum(MetodePembayaran)
   metodePembayaran: MetodePembayaran;
-
-  @ApiProperty({
-    description: 'URL bukti transaksi (opsional)',
-    example: 'http://localhost:9000/bukti/transfer-123.png',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  urlBuktiTransaksi?: string;
 
   @ApiProperty({
     description: 'Catatan transaksi (opsional)',

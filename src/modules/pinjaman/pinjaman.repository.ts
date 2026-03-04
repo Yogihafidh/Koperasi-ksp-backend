@@ -4,7 +4,6 @@ import {
   PinjamanStatus,
   Prisma,
   PrismaClient,
-  StatusTransaksi,
 } from '@prisma/client';
 
 @Injectable()
@@ -60,6 +59,17 @@ export class PinjamanRepository {
   findPinjamanById(id: number) {
     return this.prisma.pinjaman.findFirst({
       where: { id, deletedAt: null },
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+    });
+  }
+
+  softDeletePinjaman(id: number) {
+    return this.prisma.pinjaman.update({
+      where: { id },
+      data: { deletedAt: new Date() },
       include: {
         nasabah: true,
         verifiedBy: true,
@@ -126,32 +136,10 @@ export class PinjamanRepository {
       where: {
         pinjamanId,
         jenisTransaksi: JenisTransaksi.PENCAIRAN,
-        statusTransaksi: StatusTransaksi.APPROVED,
+        deletedAt: null,
       },
       _sum: {
         nominal: true,
-      },
-    });
-  }
-
-  createTransaksi(args: {
-    nasabahId: number;
-    pegawaiId: number;
-    pinjamanId: number;
-    jenisTransaksi: JenisTransaksi;
-    nominal: number;
-    tanggal: Date;
-    metodePembayaran: string;
-    statusTransaksi: StatusTransaksi;
-    urlBuktiTransaksi?: string;
-    catatan?: string;
-  }) {
-    return this.prisma.transaksi.create({
-      data: args,
-      include: {
-        nasabah: true,
-        pegawai: true,
-        pinjaman: true,
       },
     });
   }

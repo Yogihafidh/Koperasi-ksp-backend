@@ -10,7 +10,6 @@ import {
   PinjamanStatus,
   Prisma,
   PrismaClient,
-  StatusTransaksi,
 } from '@prisma/client';
 import { PinjamanRepository } from './pinjaman.repository';
 import {
@@ -80,7 +79,7 @@ export class PinjamanService {
       );
     }
 
-    const bungaPersen = dto.bungaPersen ?? defaultInterestPercent;
+    const bungaPersen = defaultInterestPercent;
     const isAutoApproved = dto.jumlahPinjaman <= autoApprovalLimit;
 
     const nasabah = await this.pinjamanRepository.findNasabahById(
@@ -293,22 +292,18 @@ export class PinjamanService {
       throw new BadRequestException('Pencairan anda tidak sesuai');
     }
 
-    const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
-
-    const transaksi = await this.pinjamanRepository.createTransaksi({
-      nasabahId: pinjaman.nasabahId,
-      pegawaiId: pegawai.id,
-      pinjamanId: pinjaman.id,
-      jenisTransaksi: JenisTransaksi.PENCAIRAN,
-      nominal,
-      tanggal,
-      metodePembayaran: dto.metodePembayaran,
-      statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
-      catatan: dto.catatan,
-    });
-
-    return this.transaksiService.processTransaksi(transaksi.id);
+    return this.transaksiService.createTransaksi(
+      {
+        nasabahId: pinjaman.nasabahId,
+        pinjamanId: pinjaman.id,
+        jenisTransaksi: JenisTransaksi.PENCAIRAN,
+        nominal,
+        tanggal: dto.tanggal,
+        metodePembayaran: dto.metodePembayaran,
+        catatan: dto.catatan,
+      },
+      userId,
+    );
   }
 
   async angsuranPinjaman(id: number, dto: AngsuranPinjamanDto, userId: number) {
@@ -338,22 +333,18 @@ export class PinjamanService {
       throw new BadRequestException('Pegawai tidak aktif');
     }
 
-    const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
-
-    const transaksi = await this.pinjamanRepository.createTransaksi({
-      nasabahId: pinjaman.nasabahId,
-      pegawaiId: pegawai.id,
-      pinjamanId: pinjaman.id,
-      jenisTransaksi: JenisTransaksi.ANGSURAN,
-      nominal: dto.nominal,
-      tanggal,
-      metodePembayaran: dto.metodePembayaran,
-      statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
-      catatan: dto.catatan,
-    });
-
-    return this.transaksiService.processTransaksi(transaksi.id);
+    return this.transaksiService.createTransaksi(
+      {
+        nasabahId: pinjaman.nasabahId,
+        pinjamanId: pinjaman.id,
+        jenisTransaksi: JenisTransaksi.ANGSURAN,
+        nominal: dto.nominal,
+        tanggal: dto.tanggal,
+        metodePembayaran: dto.metodePembayaran,
+        catatan: dto.catatan,
+      },
+      userId,
+    );
   }
 
   async listTransaksiByPinjaman(pinjamanId: number, cursor?: number) {
@@ -377,6 +368,19 @@ export class PinjamanService {
         limit: DEFAULT_PAGE_SIZE,
         hasNext: nextCursor !== null,
       },
+    };
+  }
+
+  async softDeletePinjaman(id: number) {
+    const pinjaman = await this.pinjamanRepository.findPinjamanById(id);
+    if (!pinjaman) {
+      throw new NotFoundException('Pinjaman tidak ditemukan');
+    }
+
+    await this.pinjamanRepository.softDeletePinjaman(id);
+
+    return {
+      message: 'Pinjaman berhasil dihapus',
     };
   }
 }

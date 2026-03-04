@@ -1,32 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import {
-  Prisma,
-  PrismaClient,
-  StatusTransaksi,
-  JenisTransaksi,
-  PinjamanStatus,
-} from '@prisma/client';
+import { Prisma, PrismaClient, JenisTransaksi } from '@prisma/client';
+
+const TRANSAKSI_SUMMARY_SELECT = {
+  id: true,
+  nasabahId: true,
+  pegawaiId: true,
+  rekeningSimpananId: true,
+  pinjamanId: true,
+  jenisTransaksi: true,
+  nominal: true,
+  tanggal: true,
+  metodePembayaran: true,
+  catatan: true,
+  createdAt: true,
+  deletedAt: true,
+} satisfies Prisma.TransaksiSelect;
 
 @Injectable()
 export class TransaksiRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  private readonly transaksiSummarySelect: Prisma.TransaksiSelect = {
-    id: true,
-    nasabahId: true,
-    pegawaiId: true,
-    rekeningSimpananId: true,
-    pinjamanId: true,
-    jenisTransaksi: true,
-    nominal: true,
-    tanggal: true,
-    metodePembayaran: true,
-    statusTransaksi: true,
-    urlBuktiTransaksi: true,
-    catatan: true,
-    createdAt: true,
-    deletedAt: true,
-  };
+  private readonly transaksiSummarySelect = TRANSAKSI_SUMMARY_SELECT;
 
   findPegawaiByUserId(userId: number) {
     return this.prisma.pegawai.findUnique({
@@ -60,9 +54,6 @@ export class TransaksiRepository {
       where: {
         deletedAt: null,
         nasabahId: args.nasabahId,
-        statusTransaksi: {
-          in: [StatusTransaksi.PENDING, StatusTransaksi.APPROVED],
-        },
         tanggal: {
           gte: args.tanggalFrom,
           lte: args.tanggalTo,
@@ -86,6 +77,15 @@ export class TransaksiRepository {
     });
   }
 
+  findPinjamanByIdOnly(id: number) {
+    return this.prisma.pinjaman.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+      },
+    });
+  }
+
   createTransaksi(data: {
     nasabahId: number;
     pegawaiId: number;
@@ -95,8 +95,6 @@ export class TransaksiRepository {
     nominal: number;
     tanggal: Date;
     metodePembayaran: string;
-    statusTransaksi: StatusTransaksi;
-    urlBuktiTransaksi?: string;
     catatan?: string;
   }) {
     return this.prisma.transaksi.create({
@@ -105,21 +103,17 @@ export class TransaksiRepository {
     });
   }
 
-  findTransaksiById(id: number) {
-    return this.prisma.transaksi.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        nasabah: true,
-        pegawai: true,
-        rekeningSimpanan: true,
-        pinjaman: true,
-      },
-    });
-  }
-
   findTransaksiSummaryById(id: number) {
     return this.prisma.transaksi.findFirst({
       where: { id, deletedAt: null },
+      select: this.transaksiSummarySelect,
+    });
+  }
+
+  softDeleteTransaksi(id: number) {
+    return this.prisma.transaksi.update({
+      where: { id },
+      data: { deletedAt: new Date() },
       select: this.transaksiSummarySelect,
     });
   }
@@ -154,15 +148,11 @@ export class TransaksiRepository {
   listTransaksi(args: {
     cursor?: number;
     take: number;
-    statusTransaksi?: StatusTransaksi;
     jenisTransaksi?: JenisTransaksi;
     tanggalFrom?: Date;
     tanggalTo?: Date;
   }) {
     const where: Record<string, unknown> = {};
-    if (args.statusTransaksi) {
-      where.statusTransaksi = args.statusTransaksi;
-    }
     if (args.jenisTransaksi) {
       where.jenisTransaksi = args.jenisTransaksi;
     }
@@ -204,14 +194,6 @@ export class TransaksiRepository {
     });
   }
 
-  listTransaksiPending(args: { cursor?: number; take: number }) {
-    return this.findTransaksiList({
-      cursor: args.cursor,
-      take: args.take,
-      where: { statusTransaksi: StatusTransaksi.PENDING },
-    });
-  }
-
   listTransaksiByRekening(args: {
     rekeningSimpananId: number;
     cursor?: number;
@@ -233,78 +215,6 @@ export class TransaksiRepository {
       cursor: args.cursor,
       take: args.take,
       where: { pinjamanId: args.pinjamanId },
-    });
-  }
-
-  listTransaksiForExport(args: {
-    statusTransaksi?: StatusTransaksi;
-    jenisTransaksi?: JenisTransaksi;
-    tanggalFrom?: Date;
-    tanggalTo?: Date;
-  }) {
-    const where: Record<string, unknown> = {};
-    if (args.statusTransaksi) {
-      where.statusTransaksi = args.statusTransaksi;
-    }
-    if (args.jenisTransaksi) {
-      where.jenisTransaksi = args.jenisTransaksi;
-    }
-    if (args.tanggalFrom || args.tanggalTo) {
-      where.tanggal = {
-        ...(args.tanggalFrom ? { gte: args.tanggalFrom } : {}),
-        ...(args.tanggalTo ? { lte: args.tanggalTo } : {}),
-      };
-    }
-
-    return this.prisma.transaksi.findMany({
-      where: { deletedAt: null, ...where },
-      select: this.transaksiSummarySelect,
-      orderBy: { id: 'desc' },
-    });
-  }
-
-  applyTransaksi(args: {
-    transaksiId: number;
-    statusTransaksi: StatusTransaksi;
-    catatan?: string;
-    updateRekening?: {
-      id: number;
-      saldoBerjalan: Prisma.Decimal | Prisma.DecimalJsLike | number | string;
-    };
-    updatePinjaman?: {
-      id: number;
-      sisaPinjaman: Prisma.Decimal | Prisma.DecimalJsLike | number | string;
-      status?: PinjamanStatus;
-    };
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      if (args.updateRekening) {
-        await tx.rekeningSimpanan.update({
-          where: { id: args.updateRekening.id },
-          data: { saldoBerjalan: args.updateRekening.saldoBerjalan },
-        });
-      }
-
-      if (args.updatePinjaman) {
-        await tx.pinjaman.update({
-          where: { id: args.updatePinjaman.id },
-          data: {
-            sisaPinjaman: args.updatePinjaman.sisaPinjaman,
-            ...(args.updatePinjaman.status
-              ? { status: args.updatePinjaman.status }
-              : {}),
-          },
-        });
-      }
-
-      return tx.transaksi.update({
-        where: { id: args.transaksiId },
-        data: {
-          statusTransaksi: args.statusTransaksi,
-          catatan: args.catatan ?? undefined,
-        },
-        select: this.transaksiSummarySelect,
-      });
     });
   }
 }

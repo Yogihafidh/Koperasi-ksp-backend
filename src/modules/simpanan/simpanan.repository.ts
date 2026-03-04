@@ -1,11 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  JenisTransaksi,
-  PinjamanStatus,
-  Prisma,
-  PrismaClient,
-  StatusTransaksi,
-} from '@prisma/client';
+import { PinjamanStatus, Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class SimpananRepository {
@@ -63,24 +57,17 @@ export class SimpananRepository {
     });
   }
 
-  createTransaksi(args: {
-    nasabahId: number;
-    pegawaiId: number;
-    rekeningSimpananId: number;
-    jenisTransaksi: JenisTransaksi;
-    nominal: number;
-    tanggal: Date;
-    metodePembayaran: string;
-    statusTransaksi: StatusTransaksi;
-    urlBuktiTransaksi?: string;
-    catatan?: string;
-  }) {
-    return this.prisma.transaksi.create({
-      data: args,
+  softDeleteRekening(id: number) {
+    return this.prisma.rekeningSimpanan.update({
+      where: { id },
+      data: { deletedAt: new Date() },
       include: {
-        nasabah: true,
-        pegawai: true,
-        rekeningSimpanan: true,
+        nasabah: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
       },
     });
   }

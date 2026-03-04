@@ -10,7 +10,6 @@ import {
   PinjamanStatus,
   Prisma,
   PrismaClient,
-  StatusTransaksi,
 } from '@prisma/client';
 import { SimpananRepository } from './simpanan.repository';
 import { SimpananTransaksiDto } from './dto';
@@ -98,22 +97,18 @@ export class SimpananService {
       );
     }
 
-    const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
-
-    const transaksi = await this.simpananRepository.createTransaksi({
-      nasabahId: rekening.nasabahId,
-      pegawaiId: pegawai.id,
-      rekeningSimpananId: rekening.id,
-      jenisTransaksi: JenisTransaksi.SETORAN,
-      nominal: dto.nominal,
-      tanggal,
-      metodePembayaran: dto.metodePembayaran,
-      statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
-      catatan: dto.catatan,
-    });
-
-    return this.transaksiService.processTransaksi(transaksi.id);
+    return this.transaksiService.createTransaksi(
+      {
+        nasabahId: rekening.nasabahId,
+        rekeningSimpananId: rekening.id,
+        jenisTransaksi: JenisTransaksi.SETORAN,
+        nominal: dto.nominal,
+        tanggal: dto.tanggal,
+        metodePembayaran: dto.metodePembayaran,
+        catatan: dto.catatan,
+      },
+      userId,
+    );
   }
 
   async penarikanSimpanan(
@@ -163,22 +158,18 @@ export class SimpananService {
       throw new BadRequestException('Saldo simpanan tidak mencukupi');
     }
 
-    const tanggal = dto.tanggal ? new Date(dto.tanggal) : new Date();
-
-    const transaksi = await this.simpananRepository.createTransaksi({
-      nasabahId: rekening.nasabahId,
-      pegawaiId: pegawai.id,
-      rekeningSimpananId: rekening.id,
-      jenisTransaksi: JenisTransaksi.PENARIKAN,
-      nominal: dto.nominal,
-      tanggal,
-      metodePembayaran: dto.metodePembayaran,
-      statusTransaksi: StatusTransaksi.PENDING,
-      urlBuktiTransaksi: dto.urlBuktiTransaksi,
-      catatan: dto.catatan,
-    });
-
-    return this.transaksiService.processTransaksi(transaksi.id);
+    return this.transaksiService.createTransaksi(
+      {
+        nasabahId: rekening.nasabahId,
+        rekeningSimpananId: rekening.id,
+        jenisTransaksi: JenisTransaksi.PENARIKAN,
+        nominal: dto.nominal,
+        tanggal: dto.tanggal,
+        metodePembayaran: dto.metodePembayaran,
+        catatan: dto.catatan,
+      },
+      userId,
+    );
   }
 
   async listTransaksiByRekening(rekeningId: number, cursor?: number) {
@@ -202,6 +193,25 @@ export class SimpananService {
         limit: DEFAULT_PAGE_SIZE,
         hasNext: nextCursor !== null,
       },
+    };
+  }
+
+  async softDeleteRekening(id: number) {
+    const rekening = await this.simpananRepository.findRekeningById(id);
+    if (!rekening) {
+      throw new NotFoundException('Rekening simpanan tidak ditemukan');
+    }
+
+    if (rekening.saldoBerjalan.greaterThan(new Prisma.Decimal(0))) {
+      throw new BadRequestException(
+        'Rekening dengan saldo masih ada tidak dapat dihapus',
+      );
+    }
+
+    await this.simpananRepository.softDeleteRekening(id);
+
+    return {
+      message: 'Rekening simpanan berhasil dihapus',
     };
   }
 }

@@ -6,7 +6,12 @@ import {
   closeTestApp,
   getPrisma,
 } from '../helpers/test-app.helper';
-import { loginAsAdmin, authGet, authPost } from '../helpers/auth.helper';
+import {
+  loginAsAdmin,
+  authDelete,
+  authGet,
+  authPost,
+} from '../helpers/auth.helper';
 import { createFullNasabah } from '../helpers/factory.helper';
 
 describe('Transaksi Module (Integration)', () => {
@@ -97,18 +102,6 @@ describe('Transaksi Module (Integration)', () => {
         expect(trx.jenisTransaksi).toBe('SETORAN');
       }
     });
-
-    it('should filter by statusTransaksi', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi?statusTransaksi=APPROVED',
-        adminToken,
-      ).expect(200);
-
-      for (const trx of res.body.data) {
-        expect(trx.statusTransaksi).toBe('APPROVED');
-      }
-    });
   });
 
   describe('GET /api/transaksi/:id', () => {
@@ -121,13 +114,40 @@ describe('Transaksi Module (Integration)', () => {
 
       expect(res.body.data.id).toBe(createdTransaksiId);
       expect(res.body.data).toHaveProperty('jenisTransaksi');
-      expect(res.body.data).toHaveProperty('statusTransaksi');
       expect(res.body.data).toHaveProperty('nominal');
+    });
+  });
+
+  describe('DELETE /api/transaksi/:id', () => {
+    it('should soft-delete transaksi', async () => {
+      const res = await authDelete(
+        app,
+        `/api/transaksi/${createdTransaksiId}`,
+        adminToken,
+      ).expect(200);
+
+      expect(res.body.message).toBe('Transaksi berhasil dihapus');
+
+      await authGet(
+        app,
+        `/api/transaksi/${createdTransaksiId}`,
+        adminToken,
+      ).expect(404);
     });
   });
 
   describe('GET /api/transaksi/nasabah/:nasabahId', () => {
     it('should list transaksi by nasabah', async () => {
+      await authPost(app, '/api/transaksi', adminToken)
+        .send({
+          nasabahId,
+          rekeningSimpananId: rekeningSukarelaId,
+          jenisTransaksi: 'SETORAN',
+          nominal: 100000,
+          metodePembayaran: 'CASH',
+        })
+        .expect(201);
+
       const res = await authGet(
         app,
         `/api/transaksi/nasabah/${nasabahId}`,
@@ -136,44 +156,6 @@ describe('Transaksi Module (Integration)', () => {
 
       expect(res.body.data).toBeInstanceOf(Array);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe('GET /api/transaksi/pending', () => {
-    it('should list pending transaksi', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi/pending',
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
-    });
-  });
-
-  describe('GET /api/transaksi/export', () => {
-    it('should export transaksi data', async () => {
-      const res = await authGet(
-        app,
-        '/api/transaksi/export',
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
-    });
-
-    it('should export with date range filter', async () => {
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const to = now.toISOString();
-
-      const res = await authGet(
-        app,
-        `/api/transaksi/export?tanggalFrom=${from}&tanggalTo=${to}`,
-        adminToken,
-      ).expect(200);
-
-      expect(res.body.data).toBeInstanceOf(Array);
     });
   });
 });
