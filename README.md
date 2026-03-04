@@ -1,98 +1,236 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# KSP Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend API untuk sistem **Koperasi Simpan Pinjam (KSP)**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+API ini menangani proses bisnis utama koperasi: manajemen nasabah, simpanan, pinjaman, transaksi, laporan, dashboard, pengaturan sistem, serta autentikasi dan RBAC.
 
-## Description
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
+![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)
+![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Project Overview
 
-## Project setup
+Backend ini dirancang untuk operasional koperasi berbasis REST API dengan fokus pada:
 
-```bash
-$ npm install
+- Manajemen User, Role, Permission (RBAC)
+- Manajemen Pegawai
+- Manajemen Nasabah
+- Simpanan (setoran/penarikan)
+- Pinjaman (pengajuan, verifikasi, pencairan, angsuran)
+- Transaksi keuangan
+- Laporan keuangan & dashboard
+- Audit trail aktivitas
+- Pengaturan sistem dinamis
+
+## System Architecture
+
+```mermaid
+flowchart LR
+  A[Frontend Admin] --> B[REST API - NestJS]
+  B --> C[(PostgreSQL)]
+  B --> D[(Redis Cache)]
+  B --> E[(MinIO Object Storage)]
+  B --> F[Swagger API Docs]
+  G[GitHub Actions CI] --> B
 ```
 
-## Compile and run the project
+Arsitektur utama:
 
-```bash
-# development
-$ npm run start
+- **API Layer**: NestJS (modular architecture)
+- **Data Access**: Prisma ORM
+- **Database**: PostgreSQL
+- **Cache**: Redis
+- **Object Storage**: MinIO
+- **Auth**: JWT + RBAC (roles & permissions)
+- **Observability**: Winston logger + exception filter
+- **Containerization**: Docker + Docker Compose
+- **CI**: GitHub Actions (integration test pipeline)
 
-# watch mode
-$ npm run start:dev
+## Tech Stack
 
-# production mode
-$ npm run start:prod
+- Node.js 20+
+- NestJS 11
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- Redis
+- MinIO
+- Docker / Docker Compose
+- Swagger (OpenAPI)
+- Jest (integration testing)
+
+## Features
+
+- Authentication (access & refresh token)
+- Authorization berbasis role & permission
+- CRUD domain koperasi (pegawai, nasabah, simpanan, pinjaman, transaksi)
+- Validasi bisnis transaksi (validation-first, atomic transaction)
+- Soft delete untuk entitas tertentu
+- Laporan bulanan, cashflow, anggota, pinjaman, simpanan, transaksi
+- Dashboard ringkasan operasional
+- Audit trail untuk aktivitas kritikal
+
+## Project Structure
+
+```text
+src/
+├── common/              # shared module: guards, decorators, cache, logger, dll
+├── config/              # app/jwt/database config
+├── modules/
+│   ├── auth/
+│   ├── pegawai/
+│   ├── nasabah/
+│   ├── simpanan/
+│   ├── pinjaman/
+│   ├── transaksi/
+│   ├── laporan/
+│   ├── dashboard/
+│   ├── settings/
+│   └── audit/
+├── app.module.ts
+└── main.ts
+
+prisma/
+├── schema.prisma
+├── migrations/
+└── seed-auth.js
+
+test/
+├── integration/
+├── helpers/
+├── jest-integration.json
+└── jest-e2e.json
 ```
 
-## Run tests
+## Installation
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
+## Environment Variables
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Salin file contoh env:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+cp .env.example .env
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Variabel utama yang wajib disesuaikan:
 
-## Resources
+```env
+PORT=3000
+NODE_ENV=development
+API_PREFIX=api
 
-Check out a few resources that may come in handy when working with NestJS:
+DATABASE_URL=postgresql://user:password@localhost:5432/koperasi
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=koperasi
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+REDIS_URL=redis://localhost:6379
 
-## Support
+JWT_SECRET=your_super_secret_key
+JWT_ACCESS_EXPIRES_IN=30m
+JWT_REFRESH_EXPIRES_IN=7d
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+```
 
-## Stay in touch
+## Running the Project
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Development
+
+```bash
+npm run start:dev
+```
+
+### Production Build
+
+```bash
+npm run build
+npm run start:prod
+```
+
+## Database (Prisma)
+
+```bash
+# generate Prisma client
+npx prisma generate
+
+# local migration (development)
+npx prisma migrate dev
+
+# apply migration existing (deployment/CI)
+npx prisma migrate deploy
+
+# seed data auth awal
+node prisma/seed-auth.js
+```
+
+## Docker
+
+Jalankan semua service lokal (API, PostgreSQL, Redis, MinIO):
+
+```bash
+docker compose up -d --build
+```
+
+Stop service:
+
+```bash
+docker compose down
+```
+
+## API Documentation
+
+Swagger tersedia di:
+
+```text
+http://localhost:3000/api-docs
+```
+
+## Testing
+
+```bash
+# unit test (default jest)
+npm run test
+
+# integration test (dipakai di CI)
+npm run test:integration
+
+# e2e config tersedia (suite bisa ditambahkan sesuai kebutuhan)
+npm run test:e2e
+```
+
+## CI/CD
+
+GitHub Actions workflow tersedia di `.github/workflows/ci.yml` dengan proses utama:
+
+1. Install dependency
+2. Generate Prisma client
+3. Push schema ke database test
+4. Jalankan integration test
+
+## Security Notes
+
+- Ganti `JWT_SECRET` pada environment production.
+- Jangan commit `.env` production ke repository.
+- Batasi akses endpoint sensitif melalui RBAC.
+
+## Author
+
+**Yogi Hafidh Maulana**  
+Backend Engineer / Software Engineer
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED (private repository)
