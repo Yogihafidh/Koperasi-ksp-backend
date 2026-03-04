@@ -201,6 +201,12 @@ describe('Pinjaman Module (Integration)', () => {
       expect(res.body.data).toBeInstanceOf(Array);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     });
+
+    it('should return 404 for non-existent pinjaman transaksi history', async () => {
+      await authGet(app, '/api/pinjaman/99999/transaksi', adminToken).expect(
+        404,
+      );
+    });
   });
 
   describe('Auto-approved pinjaman flow', () => {
