@@ -122,6 +122,14 @@ export class TransaksiRepository {
     });
   }
 
+  softDeleteTransaksi(id: number) {
+    return this.prisma.transaksi.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      select: this.transaksiSummarySelect,
+    });
+  }
+
   private async findTransaksiList(args: {
     cursor?: number;
     take: number;

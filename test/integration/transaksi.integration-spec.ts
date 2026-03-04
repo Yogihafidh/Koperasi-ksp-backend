@@ -6,7 +6,12 @@ import {
   closeTestApp,
   getPrisma,
 } from '../helpers/test-app.helper';
-import { loginAsAdmin, authGet, authPost } from '../helpers/auth.helper';
+import {
+  loginAsAdmin,
+  authDelete,
+  authGet,
+  authPost,
+} from '../helpers/auth.helper';
 import { createFullNasabah } from '../helpers/factory.helper';
 
 describe('Transaksi Module (Integration)', () => {
@@ -126,8 +131,36 @@ describe('Transaksi Module (Integration)', () => {
     });
   });
 
+  describe('DELETE /api/transaksi/:id', () => {
+    it('should soft-delete transaksi', async () => {
+      const res = await authDelete(
+        app,
+        `/api/transaksi/${createdTransaksiId}`,
+        adminToken,
+      ).expect(200);
+
+      expect(res.body.message).toBe('Transaksi berhasil dihapus');
+
+      await authGet(
+        app,
+        `/api/transaksi/${createdTransaksiId}`,
+        adminToken,
+      ).expect(404);
+    });
+  });
+
   describe('GET /api/transaksi/nasabah/:nasabahId', () => {
     it('should list transaksi by nasabah', async () => {
+      await authPost(app, '/api/transaksi', adminToken)
+        .send({
+          nasabahId,
+          rekeningSimpananId: rekeningSukarelaId,
+          jenisTransaksi: 'SETORAN',
+          nominal: 100000,
+          metodePembayaran: 'CASH',
+        })
+        .expect(201);
+
       const res = await authGet(
         app,
         `/api/transaksi/nasabah/${nasabahId}`,

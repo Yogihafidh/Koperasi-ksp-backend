@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -219,5 +220,23 @@ export class PinjamanController {
     @Query('cursor', new ParseIntPipe({ optional: true })) cursor?: number,
   ) {
     return this.pinjamanService.listTransaksiByPinjaman(id, cursor);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin', 'Pimpinan')
+  @Permissions('pinjaman.verify')
+  @ApiOperation({
+    summary: 'Soft delete pinjaman',
+    description: 'Menandai pinjaman sebagai terhapus dengan mengisi deletedAt.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pinjaman berhasil dihapus (soft delete)',
+  })
+  @ApiNotFoundExample('Pinjaman tidak ditemukan')
+  @ApiAuthErrors()
+  softDeletePinjaman(@Param('id', ParseIntPipe) id: number) {
+    return this.pinjamanService.softDeletePinjaman(id);
   }
 }

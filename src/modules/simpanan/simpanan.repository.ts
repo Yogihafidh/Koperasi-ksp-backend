@@ -63,6 +63,21 @@ export class SimpananRepository {
     });
   }
 
+  softDeleteRekening(id: number) {
+    return this.prisma.rekeningSimpanan.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      include: {
+        nasabah: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+  }
+
   createTransaksi(args: {
     nasabahId: number;
     pegawaiId: number;

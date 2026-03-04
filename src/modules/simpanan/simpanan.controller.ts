@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -139,5 +140,25 @@ export class SimpananController {
     @Query('cursor', new ParseIntPipe({ optional: true })) cursor?: number,
   ) {
     return this.simpananService.listTransaksiByRekening(id, cursor);
+  }
+
+  @Delete('rekening/:id')
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin')
+  @Permissions('simpanan.read')
+  @ApiOperation({
+    summary: 'Soft delete rekening simpanan',
+    description:
+      'Menandai rekening simpanan sebagai terhapus dengan mengisi deletedAt.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Rekening simpanan berhasil dihapus (soft delete)',
+  })
+  @ApiBadRequestExample('Rekening dengan saldo masih ada tidak dapat dihapus')
+  @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
+  @ApiAuthErrors()
+  softDeleteRekening(@Param('id', ParseIntPipe) id: number) {
+    return this.simpananService.softDeleteRekening(id);
   }
 }

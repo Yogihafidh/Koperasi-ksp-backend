@@ -6,7 +6,12 @@ import {
   closeTestApp,
   getPrisma,
 } from '../helpers/test-app.helper';
-import { loginAsAdmin, authGet, authPost } from '../helpers/auth.helper';
+import {
+  loginAsAdmin,
+  authDelete,
+  authGet,
+  authPost,
+} from '../helpers/auth.helper';
 import { createFullNasabah } from '../helpers/factory.helper';
 
 describe('Simpanan Module (Integration)', () => {
@@ -161,6 +166,54 @@ describe('Simpanan Module (Integration)', () => {
       expect(res.body.data).toBeInstanceOf(Array);
       expect(res.body.data.length).toBeGreaterThanOrEqual(1);
       expect(res.body.pagination).toBeDefined();
+    });
+  });
+
+  describe('DELETE /api/simpanan/rekening/:id', () => {
+    it('should reject soft-delete when saldo is still greater than zero', async () => {
+      await authDelete(
+        app,
+        `/api/simpanan/rekening/${rekeningSukarela.id}`,
+        adminToken,
+      ).expect(400);
+    });
+
+    it('should soft-delete rekening with zero saldo', async () => {
+      const { nasabah, rekeningList } = await createFullNasabah(
+        app,
+        adminToken,
+      );
+      const rekeningZero = rekeningList.find(
+        (item: { saldoBerjalan: string }) =>
+          Number.parseFloat(item.saldoBerjalan) === 0,
+      );
+
+      expect(rekeningZero).toBeDefined();
+
+      const res = await authDelete(
+        app,
+        `/api/simpanan/rekening/${rekeningZero!.id}`,
+        adminToken,
+      ).expect(200);
+
+      expect(res.body.message).toBe('Rekening simpanan berhasil dihapus');
+
+      await authGet(
+        app,
+        `/api/simpanan/rekening/${rekeningZero!.id}`,
+        adminToken,
+      ).expect(404);
+
+      const listRes = await authGet(
+        app,
+        `/api/simpanan/nasabah/${nasabah.id}`,
+        adminToken,
+      ).expect(200);
+      expect(
+        listRes.body.data.find(
+          (item: { id: number }) => item.id === rekeningZero!.id,
+        ),
+      ).toBeUndefined();
     });
   });
 });

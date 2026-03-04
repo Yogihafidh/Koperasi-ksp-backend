@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -455,5 +456,24 @@ export class TransaksiController {
   @ApiAuthErrors()
   getTransaksiById(@Param('id', ParseIntPipe) id: number) {
     return this.transaksiService.getTransaksiById(id);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth('JWT-auth')
+  @Roles('Admin', 'Pimpinan')
+  @Permissions('transaksi.process')
+  @ApiOperation({
+    summary: 'Soft delete transaksi',
+    description:
+      'Menandai transaksi sebagai terhapus dengan mengisi deletedAt.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaksi berhasil dihapus (soft delete)',
+  })
+  @ApiNotFoundExample('Transaksi tidak ditemukan')
+  @ApiAuthErrors()
+  softDeleteTransaksi(@Param('id', ParseIntPipe) id: number) {
+    return this.transaksiService.softDeleteTransaksi(id);
   }
 }

@@ -7,6 +7,7 @@ import {
   getPrisma,
 } from '../helpers/test-app.helper';
 import {
+  authDelete,
   loginAsAdmin,
   authGet,
   authPost,
@@ -223,6 +224,38 @@ describe('Pinjaman Module (Integration)', () => {
 
         expect(res.body.message).toContain('berhasil');
       }
+    });
+  });
+
+  describe('DELETE /api/pinjaman/:id', () => {
+    let toDeletePinjamanId: number;
+
+    beforeAll(async () => {
+      const res = await authPost(app, '/api/pinjaman', adminToken)
+        .send({
+          nasabahId,
+          jumlahPinjaman: 1500000,
+          tenorBulan: 6,
+        })
+        .expect(201);
+
+      toDeletePinjamanId = res.body.data.id;
+    });
+
+    it('should soft-delete pinjaman', async () => {
+      const res = await authDelete(
+        app,
+        `/api/pinjaman/${toDeletePinjamanId}`,
+        adminToken,
+      ).expect(200);
+
+      expect(res.body.message).toBe('Pinjaman berhasil dihapus');
+
+      await authGet(
+        app,
+        `/api/pinjaman/${toDeletePinjamanId}`,
+        adminToken,
+      ).expect(404);
     });
   });
 });

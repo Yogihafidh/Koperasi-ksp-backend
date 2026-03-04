@@ -309,6 +309,20 @@ export class TransaksiService {
     };
   }
 
+  async softDeleteTransaksi(id: number) {
+    const transaksi =
+      await this.transaksiRepository.findTransaksiSummaryById(id);
+    if (!transaksi) {
+      throw new NotFoundException('Transaksi tidak ditemukan');
+    }
+
+    await this.transaksiRepository.softDeleteTransaksi(id);
+
+    return {
+      message: 'Transaksi berhasil dihapus',
+    };
+  }
+
   async listTransaksi(args: {
     cursor?: number;
     statusTransaksi?: StatusTransaksi;

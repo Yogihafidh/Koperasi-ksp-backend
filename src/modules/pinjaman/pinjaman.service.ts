@@ -377,4 +377,17 @@ export class PinjamanService {
       },
     };
   }
+
+  async softDeletePinjaman(id: number) {
+    const pinjaman = await this.pinjamanRepository.findPinjamanById(id);
+    if (!pinjaman) {
+      throw new NotFoundException('Pinjaman tidak ditemukan');
+    }
+
+    await this.pinjamanRepository.softDeletePinjaman(id);
+
+    return {
+      message: 'Pinjaman berhasil dihapus',
+    };
+  }
 }

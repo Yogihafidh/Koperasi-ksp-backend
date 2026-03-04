@@ -202,4 +202,23 @@ export class SimpananService {
       },
     };
   }
+
+  async softDeleteRekening(id: number) {
+    const rekening = await this.simpananRepository.findRekeningById(id);
+    if (!rekening) {
+      throw new NotFoundException('Rekening simpanan tidak ditemukan');
+    }
+
+    if (rekening.saldoBerjalan.greaterThan(new Prisma.Decimal(0))) {
+      throw new BadRequestException(
+        'Rekening dengan saldo masih ada tidak dapat dihapus',
+      );
+    }
+
+    await this.simpananRepository.softDeleteRekening(id);
+
+    return {
+      message: 'Rekening simpanan berhasil dihapus',
+    };
+  }
 }

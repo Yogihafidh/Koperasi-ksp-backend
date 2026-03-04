@@ -67,6 +67,17 @@ export class PinjamanRepository {
     });
   }
 
+  softDeletePinjaman(id: number) {
+    return this.prisma.pinjaman.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      include: {
+        nasabah: true,
+        verifiedBy: true,
+      },
+    });
+  }
+
   async listPinjamanByNasabah(args: {
     nasabahId: number;
     cursor?: number;
