@@ -66,7 +66,6 @@ describe('Settings Module (Integration)', () => {
       )
         .send({
           value: '75000000',
-          valueType: 'NUMBER',
           description: 'Updated max',
         })
         .expect(200);
@@ -74,21 +73,13 @@ describe('Settings Module (Integration)', () => {
       expect(res.body.data.value).toBe('75000000');
     });
 
-    it('should create new setting via upsert', async () => {
-      const res = await authPut(
-        app,
-        '/api/settings/custom.newSetting',
-        adminToken,
-      )
+    it('should return 404 for non-existent setting key', async () => {
+      await authPut(app, '/api/settings/custom.newSetting', adminToken)
         .send({
           value: 'hello',
-          valueType: 'STRING',
           description: 'New custom setting',
         })
-        .expect(200);
-
-      expect(res.body.data.key).toBe('custom.newSetting');
-      expect(res.body.data.value).toBe('hello');
+        .expect(404);
     });
   });
 

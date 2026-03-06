@@ -1,9 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import {
-  SETTING_VALUE_TYPE,
-  type SettingValueType,
-} from '../constants/settings.constants';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpsertSettingDto {
   @ApiProperty({
@@ -13,14 +9,6 @@ export class UpsertSettingDto {
   @IsString()
   @IsNotEmpty()
   value: string;
-
-  @ApiProperty({
-    description: 'Tipe nilai setting',
-    enum: SETTING_VALUE_TYPE,
-    example: SETTING_VALUE_TYPE.NUMBER,
-  })
-  @IsEnum(SETTING_VALUE_TYPE)
-  valueType: SettingValueType;
 
   @ApiPropertyOptional({
     description: 'Deskripsi setting',

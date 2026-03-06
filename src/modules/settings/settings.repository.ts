@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import type { SettingValueType } from './constants/settings.constants';
 
 @Injectable()
 export class SettingsRepository {
@@ -18,25 +17,15 @@ export class SettingsRepository {
     });
   }
 
-  upsertSetting(args: {
-    key: string;
-    value: string;
-    valueType: SettingValueType;
-    description?: string;
-  }) {
+  updateSetting(args: { key: string; value: string; description?: string }) {
     const payload = {
       value: args.value,
-      valueType: args.valueType,
       description: args.description,
     };
 
-    return this.prisma.setting.upsert({
+    return this.prisma.setting.update({
       where: { key: args.key },
-      update: payload as never,
-      create: {
-        key: args.key,
-        ...(payload as Record<string, unknown>),
-      } as never,
+      data: payload as never,
     });
   }
 }
