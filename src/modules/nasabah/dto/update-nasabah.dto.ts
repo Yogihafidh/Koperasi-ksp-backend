@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -8,6 +9,16 @@ import {
 } from 'class-validator';
 
 export class UpdateNasabahDto {
+  @ApiProperty({
+    description: 'ID pegawai penanggung jawab nasabah',
+    example: 2,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  pegawaiId?: number;
+
   @ApiProperty({
     description: 'Nama nasabah',
     example: 'Siti Aminah',

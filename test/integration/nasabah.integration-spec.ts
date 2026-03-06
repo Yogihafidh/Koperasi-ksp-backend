@@ -21,6 +21,7 @@ describe('Nasabah Module (Integration)', () => {
   let app: INestApplication;
   let adminToken: string;
   let pegawaiUserId: number;
+  let reassignedPegawaiId: number;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -46,6 +47,23 @@ describe('Nasabah Module (Integration)', () => {
     await authPost(app, `/api/users/${pegawaiUserId}/roles`, adminToken)
       .send({ roleIds: [adminRole.id] })
       .expect(201);
+
+    const reassignedUser = await registerUser(app, {
+      username: 'nasabahpegawai2',
+      email: 'nasabahpegawai2@test.com',
+      password: 'NasabahPeg456!',
+    });
+
+    const reassignedPegawai = await createTestPegawai(
+      app,
+      adminToken,
+      reassignedUser.user.id,
+      {
+        nama: 'Pegawai Reassign',
+        jabatan: 'Staff',
+      },
+    );
+    reassignedPegawaiId = reassignedPegawai.id;
   });
 
   afterAll(async () => {
@@ -139,6 +157,21 @@ describe('Nasabah Module (Integration)', () => {
 
       expect(res.body.data.alamat).toBe('Jl. Updated No. 99');
       expect(res.body.data.pekerjaan).toBe('PNS');
+    });
+
+    it('should update pegawai penanggung jawab nasabah', async () => {
+      const res = await authPatch(app, `/api/nasabah/${nasabahId}`, adminToken)
+        .send({ pegawaiId: reassignedPegawaiId })
+        .expect(200);
+
+      expect(res.body.data.pegawaiId).toBe(reassignedPegawaiId);
+      expect(res.body.data.pegawai.id).toBe(reassignedPegawaiId);
+    });
+
+    it('should return 404 when pegawaiId does not exist', async () => {
+      await authPatch(app, `/api/nasabah/${nasabahId}`, adminToken)
+        .send({ pegawaiId: 99999 })
+        .expect(404);
     });
   });
 

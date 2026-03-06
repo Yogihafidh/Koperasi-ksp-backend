@@ -48,6 +48,7 @@ export class NasabahService {
   ) {}
 
   private pickNasabahAuditFields(data: {
+    pegawaiId?: number | null;
     nomorAnggota?: string | null;
     nama?: string | null;
     nik?: string | null;
@@ -66,6 +67,7 @@ export class NasabahService {
     const tanggalDaftar = data.tanggalDaftar;
 
     return {
+      pegawaiId: data.pegawaiId ?? null,
       nomorAnggota: data.nomorAnggota ?? null,
       nama: data.nama ?? null,
       nik: data.nik ?? null,
@@ -235,6 +237,19 @@ export class NasabahService {
       throw new NotFoundException('Nasabah tidak ditemukan');
     }
 
+    if (dto.pegawaiId !== undefined) {
+      const pegawai = await this.nasabahRepository.findPegawaiById(
+        dto.pegawaiId,
+      );
+      if (!pegawai) {
+        throw new NotFoundException('Pegawai tidak ditemukan');
+      }
+
+      if (!pegawai.statusAktif) {
+        throw new BadRequestException('Pegawai tidak aktif');
+      }
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await this.nasabahRepository.updateNasabah(
         id,
@@ -254,6 +269,7 @@ export class NasabahService {
           entityId: id,
           userId,
           before: this.pickNasabahAuditFields({
+            pegawaiId: nasabah.pegawaiId,
             nomorAnggota: nasabah.nomorAnggota,
             nama: nasabah.nama,
             nik: nasabah.nik,
@@ -268,6 +284,7 @@ export class NasabahService {
             catatan: nasabah.catatan ?? null,
           }),
           after: this.pickNasabahAuditFields({
+            pegawaiId: result.pegawaiId,
             nomorAnggota: result.nomorAnggota,
             nama: result.nama,
             nik: result.nik,
