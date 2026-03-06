@@ -73,7 +73,8 @@ export class SettingsService implements OnModuleInit {
       valueType:
         (item.valueType as SettingValueType | undefined) ??
         SETTING_VALUE_TYPE.STRING,
-      description: typeof item.description === 'string' ? item.description : null,
+      description:
+        typeof item.description === 'string' ? item.description : null,
       updatedAt: new Date(item.updatedAt as Date | string),
     }));
   }
@@ -125,19 +126,23 @@ export class SettingsService implements OnModuleInit {
     };
   }
 
-  async upsertSetting(key: string, dto: UpsertSettingDto) {
-    this.validateByType(dto.value, dto.valueType);
+  async updateSetting(key: string, dto: UpsertSettingDto) {
+    const existing = await this.settingsRepository.findByKey(key);
+    if (!existing) {
+      throw new NotFoundException(`Setting ${key} tidak ditemukan`);
+    }
 
-    const updated = await this.settingsRepository.upsertSetting({
+    this.validateByType(dto.value, existing.valueType as SettingValueType);
+
+    const updated = await this.settingsRepository.updateSetting({
       key,
       value: dto.value,
-      valueType: dto.valueType,
       description: dto.description,
     });
 
     await this.cacheService.del(this.cacheKeyAll);
     return {
-      message: 'Setting berhasil disimpan',
+      message: 'Setting berhasil diperbarui',
       data: updated,
     };
   }

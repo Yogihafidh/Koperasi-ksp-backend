@@ -93,13 +93,13 @@ export class SettingsController {
   @ApiBearerAuth('JWT-auth')
   @Roles('Admin')
   @Permissions('settings.update')
-  @ApiOperation({ summary: 'Buat atau update setting sistem' })
+  @ApiOperation({ summary: 'Update setting sistem' })
   @ApiResponse({
     status: 200,
-    description: 'Setting berhasil disimpan',
+    description: 'Setting berhasil diperbarui',
   })
   @ApiAuthErrors()
-  upsertSetting(@Param('key') key: string, @Body() dto: UpsertSettingDto) {
-    return this.settingsService.upsertSetting(key, dto);
+  updateSetting(@Param('key') key: string, @Body() dto: UpsertSettingDto) {
+    return this.settingsService.updateSetting(key, dto);
   }
 }
