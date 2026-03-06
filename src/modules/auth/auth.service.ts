@@ -40,6 +40,17 @@ export class AuthService {
     return `auth:blacklist:${token}`;
   }
 
+  private getBcryptRounds(): number {
+    const rawRounds = this.configService.get<string | number>('BCRYPT_ROUNDS');
+    const parsedRounds = Number(rawRounds);
+
+    if (!Number.isFinite(parsedRounds) || parsedRounds < 4) {
+      return 10;
+    }
+
+    return Math.floor(parsedRounds);
+  }
+
   // ==================== AUTHENTICATION ====================
   async register(registerDto: RegisterDto) {
     // Check if username already exists
@@ -59,10 +70,9 @@ export class AuthService {
     }
 
     // Hash password
-    const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') || 10;
     const hashedPassword = await bcrypt.hash(
       registerDto.password,
-      bcryptRounds,
+      this.getBcryptRounds(),
     );
 
     // Create user
@@ -237,10 +247,9 @@ export class AuthService {
     }
 
     // Hash new password
-    const bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS') || 10;
     const hashedPassword = await bcrypt.hash(
       changePasswordDto.newPassword,
-      bcryptRounds,
+      this.getBcryptRounds(),
     );
 
     // Update password
@@ -291,11 +300,9 @@ export class AuthService {
 
     // Hash password if being updated
     if (updateUserDto.password) {
-      const bcryptRounds =
-        this.configService.get<number>('BCRYPT_ROUNDS') || 10;
       updateData.password = await bcrypt.hash(
         updateUserDto.password,
-        bcryptRounds,
+        this.getBcryptRounds(),
       );
     }
 
