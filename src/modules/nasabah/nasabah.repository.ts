@@ -39,6 +39,17 @@ export class NasabahRepository {
         nama: true,
         jabatan: true,
         userId: true,
+        statusAktif: true,
+      },
+    });
+  }
+
+  findPegawaiById(id: number) {
+    return this.prisma.pegawai.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        statusAktif: true,
       },
     });
   }
@@ -137,6 +148,7 @@ export class NasabahRepository {
   updateNasabah(
     id: number,
     data: {
+      pegawaiId?: number;
       nama?: string;
       alamat?: string;
       noHp?: string;
