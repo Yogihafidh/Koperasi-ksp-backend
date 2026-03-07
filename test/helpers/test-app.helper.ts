@@ -100,6 +100,7 @@ export async function seedDatabase(p?: PrismaClient): Promise<void> {
     { code: 'laporan.generate', description: 'Generate laporan' },
     { code: 'laporan.finalize', description: 'Finalize laporan' },
     { code: 'dashboard.read', description: 'Read dashboard' },
+    { code: 'audit.read', description: 'Read audit trail' },
     { code: 'settings.read', description: 'Read settings' },
     { code: 'settings.update', description: 'Update settings' },
   ];
@@ -276,6 +277,7 @@ export async function seedDatabase(p?: PrismaClient): Promise<void> {
     'laporan.generate',
     'laporan.finalize',
     'dashboard.read',
+    'audit.read',
   ];
   const pimpinanPerms = await client.permission.findMany({
     where: { code: { in: pimpinanCodes } },

@@ -1,7 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditAction, Prisma } from '@prisma/client';
 import { AuditRepository } from './audit.repository';
 import { buildDiff, maskSensitiveFields } from './audit.utils';
+import { DEFAULT_PAGE_SIZE } from '../../common/constants/pagination.constants';
 
 type LogPayload = {
   userId?: number | null;
@@ -16,6 +21,87 @@ type LogPayload = {
 @Injectable()
 export class AuditTrailService {
   constructor(private readonly auditRepository: AuditRepository) {}
+
+  async getAuditTrailById(id: string) {
+    const auditTrail = await this.auditRepository.findAuditTrailById(id);
+
+    if (!auditTrail) {
+      throw new NotFoundException('Audit trail tidak ditemukan');
+    }
+
+    return {
+      message: 'Berhasil mengambil detail audit trail',
+      data: auditTrail,
+    };
+  }
+
+  async listAuditTrails(query: {
+    page?: number;
+    limit?: number;
+    action?: AuditAction;
+    userId?: number;
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limitRaw =
+      query.limit && query.limit > 0 ? query.limit : DEFAULT_PAGE_SIZE;
+    const limit = Math.min(limitRaw, 100);
+
+    const fromDate = this.parseDate(query.fromDate, 'fromDate');
+    const toDate = this.parseDate(query.toDate, 'toDate');
+
+    if (fromDate && toDate && fromDate > toDate) {
+      throw new BadRequestException(
+        'fromDate tidak boleh lebih besar dari toDate',
+      );
+    }
+
+    const filters = {
+      action: query.action,
+      userId: query.userId,
+      fromDate,
+      toDate,
+    };
+
+    const [data, total] = await Promise.all([
+      this.auditRepository.findAuditTrails({ page, limit, ...filters }),
+      this.auditRepository.countAuditTrails(filters),
+    ]);
+
+    const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+    return {
+      message: 'Berhasil mengambil data audit trail',
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  private parseDate(
+    value: string | undefined,
+    fieldName: string,
+  ): Date | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(
+        `${fieldName} harus berupa tanggal ISO yang valid`,
+      );
+    }
+
+    return parsed;
+  }
 
   async log(payload: LogPayload, tx?: Prisma.TransactionClient) {
     const { oldValue, newValue } = buildDiff(payload.before, payload.after);

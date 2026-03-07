@@ -53,6 +53,7 @@ async function seed() {
       { code: 'laporan.finalize', description: 'Finalize laporan' },
 
       { code: 'dashboard.read', description: 'Read dashboard' },
+      { code: 'audit.read', description: 'Read audit trail' },
 
       { code: 'settings.read', description: 'Read settings' },
       { code: 'settings.update', description: 'Update settings' },
@@ -279,6 +280,7 @@ async function seed() {
       'laporan.generate',
       'laporan.finalize',
       'dashboard.read',
+      'audit.read',
     ];
 
     const pimpinanPermissions = await prisma.permission.findMany({
