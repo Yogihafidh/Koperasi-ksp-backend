@@ -24,10 +24,7 @@ import {
   ApiBadRequestExample,
   ApiNotFoundExample,
 } from '../../common/decorators/api-docs.decorator';
-import {
-  JwtAuthGuard,
-  PermissionsGuard,
-} from '../../common/guards';
+import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
 import type { Request } from 'express';
 
 @ApiTags('users')
@@ -131,18 +128,16 @@ export class UsersController {
       'application/json': {
         example: {
           message: 'Berhasil mengambil role user',
-          data: [
-            {
-              id: 1,
-              name: 'Admin',
-              description: 'Administrator dengan akses penuh',
-            },
-            {
-              id: 2,
-              name: 'Kasir',
-              description: 'Kasir yang menangani transaksi harian',
-            },
-          ],
+          data: {
+            userId: 1,
+            roles: ['Admin', 'Kasir'],
+            permissions: [
+              'user.read',
+              'user.update',
+              'transaksi.read',
+              'dashboard.read',
+            ],
+          },
         },
       },
     },
@@ -153,4 +148,3 @@ export class UsersController {
     return this.authService.getUserRoles(id);
   }
 }
-

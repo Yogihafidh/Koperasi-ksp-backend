@@ -795,9 +795,20 @@ export class AuthService {
 
     const userRoles = await this.authRepository.getUserRoles(userId);
 
+    const roles = userRoles.map((userRole) => userRole.role.name);
+    const permissions = userRoles.flatMap((userRole) =>
+      userRole.role.permissions.map(
+        (rolePermission) => rolePermission.permission.code,
+      ),
+    );
+
     return {
       message: 'Berhasil mengambil role user',
-      data: userRoles,
+      data: {
+        userId,
+        roles,
+        permissions: [...new Set(permissions)],
+      },
     };
   }
 }

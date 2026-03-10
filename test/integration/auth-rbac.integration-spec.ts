@@ -233,8 +233,10 @@ describe('Auth RBAC (Integration)', () => {
         adminToken,
       ).expect(200);
 
-      expect(res.body.data).toBeInstanceOf(Array);
-      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data.userId).toBe(testUserId);
+      expect(res.body.data.roles).toBeInstanceOf(Array);
+      expect(res.body.data.roles.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data.permissions).toBeInstanceOf(Array);
     });
 
     it('should remove role from user', async () => {
@@ -243,7 +245,14 @@ describe('Auth RBAC (Integration)', () => {
         `/api/users/${testUserId}/roles`,
         adminToken,
       ).expect(200);
-      const roleId = userRoles.body.data[0].roleId;
+
+      const rolesRes = await authGet(app, '/api/roles', adminToken).expect(200);
+      const roleName = userRoles.body.data.roles[0];
+      const roleId = rolesRes.body.data.find(
+        (role: { id: number; name: string }) => role.name === roleName,
+      )?.id;
+
+      expect(roleId).toBeDefined();
 
       await authDelete(
         app,
@@ -256,7 +265,7 @@ describe('Auth RBAC (Integration)', () => {
         `/api/users/${testUserId}/roles`,
         adminToken,
       ).expect(200);
-      expect(updatedRoles.body.data.length).toBe(0);
+      expect(updatedRoles.body.data.roles.length).toBe(0);
     });
   });
 
