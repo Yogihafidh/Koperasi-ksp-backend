@@ -27,6 +27,7 @@ async function seed() {
       { code: 'nasabah.create', description: 'Create nasabah' },
       { code: 'nasabah.read', description: 'Read nasabah' },
       { code: 'nasabah.update', description: 'Update nasabah' },
+      { code: 'nasabah.verify', description: 'Verify nasabah' },
       { code: 'nasabah.delete', description: 'Delete nasabah' },
 
       { code: 'pegawai.create', description: 'Create pegawai' },
@@ -270,6 +271,7 @@ async function seed() {
     console.log('3.4 Assigning permissions to Pimpinan role...');
     const pimpinanPermissionCodes = [
       'nasabah.read',
+      'nasabah.verify',
       'pegawai.read',
       'simpanan.read',
       'pinjaman.read',

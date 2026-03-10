@@ -31,10 +31,7 @@ import {
   UpdateNasabahStatusDto,
 } from './dto';
 import { Permissions, CurrentUser } from '../../common/decorators';
-import {
-  JwtAuthGuard,
-  PermissionsGuard,
-} from '../../common/guards';
+import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -295,7 +292,7 @@ export class NasabahController {
 
   @Patch(':id/verifikasi')
   @ApiBearerAuth('JWT-auth')
-  @Permissions('nasabah.update')
+  @Permissions('nasabah.verify')
   @ApiOperation({
     summary: 'Verifikasi nasabah',
     description:
@@ -382,4 +379,3 @@ export class NasabahController {
     );
   }
 }
-
