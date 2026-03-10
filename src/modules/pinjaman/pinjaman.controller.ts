@@ -69,6 +69,24 @@ export class PinjamanController {
   @ApiResponse({
     status: 201,
     description: 'Pengajuan pinjaman berhasil dibuat',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Pengajuan pinjaman berhasil dibuat',
+          data: {
+            id: 101,
+            nasabahId: 1,
+            jumlahPinjaman: 5000000,
+            bungaPersen: 1.5,
+            tenorBulan: 12,
+            sisaPinjaman: 0,
+            status: 'PENDING',
+            verifiedById: null,
+            tanggalPersetujuan: null,
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Nasabah tidak aktif')
   @ApiNotFoundExample('Nasabah tidak ditemukan')
@@ -88,6 +106,24 @@ export class PinjamanController {
   @ApiResponse({
     status: 200,
     description: 'Detail pinjaman berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil detail pinjaman',
+          data: {
+            id: 101,
+            nasabahId: 1,
+            jumlahPinjaman: 5000000,
+            bungaPersen: 1.5,
+            tenorBulan: 12,
+            sisaPinjaman: 5000000,
+            status: 'DISETUJUI',
+            verifiedById: 2,
+            tanggalPersetujuan: '2026-03-10T08:00:00.000Z',
+          },
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
   @ApiAuthErrors()
@@ -108,6 +144,28 @@ export class PinjamanController {
   @ApiResponse({
     status: 200,
     description: 'Daftar pinjaman nasabah berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil data pinjaman nasabah',
+          data: [
+            {
+              id: 101,
+              nasabahId: 1,
+              jumlahPinjaman: 5000000,
+              tenorBulan: 12,
+              status: 'DISETUJUI',
+              sisaPinjaman: 3500000,
+            },
+          ],
+          pagination: {
+            nextCursor: null,
+            limit: 20,
+            hasNext: false,
+          },
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   listPinjamanByNasabah(
@@ -125,6 +183,19 @@ export class PinjamanController {
   @ApiResponse({
     status: 200,
     description: 'Verifikasi pinjaman berhasil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Verifikasi pinjaman berhasil',
+          data: {
+            id: 101,
+            status: 'DISETUJUI',
+            verifiedById: 2,
+            tanggalPersetujuan: '2026-03-10T08:30:00.000Z',
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Status verifikasi tidak valid')
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
@@ -155,6 +226,23 @@ export class PinjamanController {
   @ApiResponse({
     status: 201,
     description: 'Pencairan pinjaman berhasil dicatat',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Transaksi berhasil diproses',
+          data: {
+            id: 801,
+            nasabahId: 1,
+            pegawaiId: 2,
+            pinjamanId: 101,
+            jenisTransaksi: 'PENCAIRAN',
+            nominal: 5000000,
+            tanggal: '2026-03-10T09:00:00.000Z',
+            metodePembayaran: 'TRANSFER',
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Pencairan pinjaman sudah dibuat')
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
@@ -179,6 +267,23 @@ export class PinjamanController {
   @ApiResponse({
     status: 201,
     description: 'Angsuran pinjaman berhasil dicatat',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Transaksi berhasil diproses',
+          data: {
+            id: 802,
+            nasabahId: 1,
+            pegawaiId: 2,
+            pinjamanId: 101,
+            jenisTransaksi: 'ANGSURAN',
+            nominal: 500000,
+            tanggal: '2026-03-10T09:30:00.000Z',
+            metodePembayaran: 'TUNAI',
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Nominal melebihi sisa pinjaman')
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
@@ -204,6 +309,34 @@ export class PinjamanController {
   @ApiResponse({
     status: 200,
     description: 'Histori transaksi pinjaman berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil histori transaksi pinjaman',
+          data: [
+            {
+              id: 801,
+              pinjamanId: 101,
+              jenisTransaksi: 'PENCAIRAN',
+              nominal: 5000000,
+              tanggal: '2026-03-10T09:00:00.000Z',
+            },
+            {
+              id: 802,
+              pinjamanId: 101,
+              jenisTransaksi: 'ANGSURAN',
+              nominal: 500000,
+              tanggal: '2026-03-10T09:30:00.000Z',
+            },
+          ],
+          pagination: {
+            nextCursor: null,
+            limit: 20,
+            hasNext: false,
+          },
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
   @ApiAuthErrors()
@@ -224,6 +357,13 @@ export class PinjamanController {
   @ApiResponse({
     status: 200,
     description: 'Pinjaman berhasil dihapus (soft delete)',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Pinjaman berhasil dihapus',
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Pinjaman tidak ditemukan')
   @ApiAuthErrors()

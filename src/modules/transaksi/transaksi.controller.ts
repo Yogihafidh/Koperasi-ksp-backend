@@ -289,6 +289,13 @@ export class TransaksiController {
   @ApiResponse({
     status: 200,
     description: 'Transaksi berhasil dihapus (soft delete)',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Transaksi berhasil dihapus',
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Transaksi tidak ditemukan')
   @ApiAuthErrors()
