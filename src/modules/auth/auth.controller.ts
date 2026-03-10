@@ -18,14 +18,13 @@ import {
 } from '../../common/decorators/api-docs.decorator';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import type { UserFromJwt } from './interfaces/jwt-payload.interface';
 
 @ApiTags('auth')
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -182,3 +181,4 @@ export class AuthController {
     return this.authService.logout(token, request.ip);
   }
 }
+

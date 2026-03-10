@@ -80,6 +80,7 @@ export async function seedDatabase(p?: PrismaClient): Promise<void> {
     { code: 'nasabah.create', description: 'Create nasabah' },
     { code: 'nasabah.read', description: 'Read nasabah' },
     { code: 'nasabah.update', description: 'Update nasabah' },
+    { code: 'nasabah.verify', description: 'Verify nasabah' },
     { code: 'nasabah.delete', description: 'Delete nasabah' },
     { code: 'pegawai.create', description: 'Create pegawai' },
     { code: 'pegawai.read', description: 'Read pegawai' },
@@ -267,6 +268,7 @@ export async function seedDatabase(p?: PrismaClient): Promise<void> {
   // Pimpinan permissions
   const pimpinanCodes = [
     'nasabah.read',
+    'nasabah.verify',
     'pegawai.read',
     'simpanan.read',
     'pinjaman.read',

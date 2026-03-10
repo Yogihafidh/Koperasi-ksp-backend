@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AssignRolesDto, UpdateUserDto } from './dto';
-import { Roles, Permissions } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -26,21 +26,19 @@ import {
 } from '../../common/decorators/api-docs.decorator';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import type { Request } from 'express';
 
 @ApiTags('users')
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class UsersController {
   constructor(private readonly authService: AuthService) {}
 
   // ==================== USER MANAGEMENT ENDPOINTS ====================
   @Patch(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('user.update')
   @ApiOperation({ summary: 'Update data pengguna (Admin only)' })
   @ApiResponse({
@@ -73,7 +71,6 @@ export class UsersController {
   // ==================== USER-ROLE ASSIGNMENT ENDPOINTS ====================
   @Post(':id/roles')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('user.update')
   @ApiOperation({ summary: 'Assign roles ke user (Admin only)' })
   @ApiResponse({
@@ -100,7 +97,6 @@ export class UsersController {
 
   @Delete(':userId/roles/:roleId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('user.update')
   @ApiOperation({ summary: 'Hapus role dari user (Admin only)' })
   @ApiResponse({
@@ -126,7 +122,6 @@ export class UsersController {
 
   @Get(':id/roles')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('user.read')
   @ApiOperation({ summary: 'Dapatkan roles dari user (Admin only)' })
   @ApiResponse({
@@ -158,3 +153,4 @@ export class UsersController {
     return this.authService.getUserRoles(id);
   }
 }
+

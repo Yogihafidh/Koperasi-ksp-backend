@@ -23,10 +23,9 @@ import {
   UpdatePegawaiDto,
   TogglePegawaiStatusDto,
 } from './dto';
-import { CurrentUser, Roles, Permissions } from '../../common/decorators';
+import { CurrentUser, Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import {
@@ -40,13 +39,12 @@ import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('pegawai')
 @Controller('pegawai')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PegawaiController {
   constructor(private readonly pegawaiService: PegawaiService) {}
 
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('pegawai.create')
   @ApiOperation({ summary: 'Buat data pegawai' })
   @ApiResponse({
@@ -89,7 +87,6 @@ export class PegawaiController {
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('pegawai.read')
   @ApiOperation({ summary: 'Dapatkan semua pegawai' })
   @ApiQuery({
@@ -134,7 +131,6 @@ export class PegawaiController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('pegawai.read')
   @ApiOperation({ summary: 'Dapatkan pegawai berdasarkan ID' })
   @ApiResponse({
@@ -171,7 +167,6 @@ export class PegawaiController {
 
   @Patch(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('pegawai.update')
   @ApiOperation({ summary: 'Update data pegawai' })
   @ApiResponse({
@@ -214,7 +209,6 @@ export class PegawaiController {
 
   @Patch(':id/status')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('pegawai.update')
   @ApiOperation({ summary: 'Aktifkan atau nonaktifkan pegawai' })
   @ApiResponse({
@@ -260,3 +254,4 @@ export class PegawaiController {
     );
   }
 }
+

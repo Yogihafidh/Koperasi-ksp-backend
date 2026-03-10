@@ -20,12 +20,8 @@ import {
 import { JenisTransaksi } from '@prisma/client';
 import { TransaksiService } from './transaksi.service';
 import { CreateTransaksiDto } from './dto';
-import { CurrentUser, Permissions, Roles } from '../../common/decorators';
-import {
-  JwtAuthGuard,
-  RolesGuard,
-  PermissionsGuard,
-} from '../../common/guards';
+import { CurrentUser, Permissions } from '../../common/decorators';
+import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -35,13 +31,12 @@ import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('transaksi')
 @Controller('transaksi')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TransaksiController {
   constructor(private readonly transaksiService: TransaksiService) {}
 
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('transaksi.create')
   @ApiOperation({
     summary: 'Buat transaksi baru',
@@ -86,7 +81,6 @@ export class TransaksiController {
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan daftar transaksi',
@@ -160,7 +154,6 @@ export class TransaksiController {
 
   @Get('nasabah/:nasabahId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan', 'Staff', 'Kasir')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan transaksi per nasabah',
@@ -207,7 +200,6 @@ export class TransaksiController {
 
   @Get('pegawai/:pegawaiId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan transaksi per pegawai',
@@ -254,7 +246,6 @@ export class TransaksiController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan', 'Staff', 'Kasir')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan detail transaksi',
@@ -289,7 +280,6 @@ export class TransaksiController {
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('transaksi.process')
   @ApiOperation({
     summary: 'Soft delete transaksi',

@@ -30,12 +30,8 @@ import {
   VerifikasiNasabahDto,
   UpdateNasabahStatusDto,
 } from './dto';
-import { Roles, Permissions, CurrentUser } from '../../common/decorators';
-import {
-  JwtAuthGuard,
-  RolesGuard,
-  PermissionsGuard,
-} from '../../common/guards';
+import { Permissions, CurrentUser } from '../../common/decorators';
+import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -47,13 +43,12 @@ import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('nasabah')
 @Controller('nasabah')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class NasabahController {
   constructor(private readonly nasabahService: NasabahService) {}
 
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('nasabah.create')
   @ApiOperation({ summary: 'Registrasi nasabah' })
   @ApiResponse({
@@ -89,7 +84,6 @@ export class NasabahController {
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('nasabah.read')
   @ApiOperation({ summary: 'Dapatkan semua nasabah' })
   @ApiQuery({
@@ -136,7 +130,6 @@ export class NasabahController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('nasabah.read')
   @ApiOperation({ summary: 'Dapatkan nasabah berdasarkan ID' })
   @ApiResponse({
@@ -165,7 +158,6 @@ export class NasabahController {
 
   @Patch(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('nasabah.update')
   @ApiOperation({ summary: 'Update data nasabah' })
   @ApiResponse({
@@ -199,7 +191,6 @@ export class NasabahController {
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('nasabah.delete')
   @ApiOperation({ summary: 'Hapus data nasabah' })
   @ApiResponse({
@@ -221,7 +212,6 @@ export class NasabahController {
 
   @Post(':id/dokumen')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('nasabah.update')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -302,8 +292,7 @@ export class NasabahController {
 
   @Patch(':id/verifikasi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
-  @Permissions('nasabah.update')
+  @Permissions('nasabah.verify')
   @ApiOperation({
     summary: 'Verifikasi nasabah',
     description:
@@ -348,7 +337,6 @@ export class NasabahController {
 
   @Patch(':id/status')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('nasabah.update')
   @ApiOperation({
     summary: 'Ubah status keanggotaan nasabah',
