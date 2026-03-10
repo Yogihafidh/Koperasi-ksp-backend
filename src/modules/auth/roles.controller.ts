@@ -25,10 +25,7 @@ import {
   ApiConflictExample,
   ApiNotFoundExample,
 } from '../../common/decorators/api-docs.decorator';
-import {
-  JwtAuthGuard,
-  PermissionsGuard,
-} from '../../common/guards';
+import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
 import type { Request } from 'express';
 
 @ApiTags('roles')
@@ -81,11 +78,13 @@ export class RolesController {
               id: 1,
               name: 'Admin',
               description: 'Administrator dengan akses penuh',
+              totalUsers: 1,
             },
             {
               id: 2,
               name: 'Kasir',
               description: 'Kasir yang menangani transaksi harian',
+              totalUsers: 0,
             },
           ],
         },
@@ -107,11 +106,24 @@ export class RolesController {
     content: {
       'application/json': {
         example: {
-          message: 'Berhasil mengambil data role',
+          message: 'Berhasil mengambil detail role',
           data: {
             id: 1,
             name: 'Admin',
             description: 'Administrator dengan akses penuh',
+            permissions: [
+              'user.create',
+              'user.read',
+              'role.read',
+              'dashboard.read',
+            ],
+            users: [
+              {
+                id: 1,
+                username: 'admin',
+                email: 'admin@koperasi.com',
+              },
+            ],
           },
         },
       },
@@ -235,4 +247,3 @@ export class RolesController {
     );
   }
 }
-
