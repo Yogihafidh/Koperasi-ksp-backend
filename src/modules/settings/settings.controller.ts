@@ -93,6 +93,21 @@ export class SettingsController {
   @ApiResponse({
     status: 200,
     description: 'Setting berhasil diperbarui',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Setting berhasil diperbarui',
+          data: {
+            id: 1,
+            key: 'loan.maxTenorMonths',
+            value: '36',
+            valueType: 'NUMBER',
+            description: 'Batas maksimum tenor pinjaman (bulan)',
+            updatedAt: '2026-03-10T11:00:00.000Z',
+          },
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   updateSetting(@Param('key') key: string, @Body() dto: UpsertSettingDto) {

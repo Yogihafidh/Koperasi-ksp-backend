@@ -47,6 +47,31 @@ export class AuditController {
   @ApiResponse({
     status: 200,
     description: 'Daftar audit trail berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil data audit trail',
+          data: [
+            {
+              id: 'c5e5b4db-8f8a-4cae-bb92-fd1c7a0f3b44',
+              action: 'UPDATE',
+              entityName: 'Nasabah',
+              entityId: 1,
+              userId: 2,
+              createdAt: '2026-03-10T08:00:00.000Z',
+            },
+          ],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 1,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   listAuditTrails(@Query() query: ListAuditTrailQueryDto) {
@@ -60,6 +85,23 @@ export class AuditController {
   @ApiResponse({
     status: 200,
     description: 'Detail audit trail berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil detail audit trail',
+          data: {
+            id: 'c5e5b4db-8f8a-4cae-bb92-fd1c7a0f3b44',
+            action: 'UPDATE',
+            entityName: 'Nasabah',
+            entityId: 1,
+            userId: 2,
+            oldValue: { status: 'PENDING' },
+            newValue: { status: 'AKTIF' },
+            createdAt: '2026-03-10T08:00:00.000Z',
+          },
+        },
+      },
+    },
   })
   @ApiAuthErrors()
   getAuditTrailById(@Param('id') id: string) {

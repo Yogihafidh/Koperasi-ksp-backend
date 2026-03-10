@@ -44,6 +44,21 @@ export class SimpananController {
   @ApiResponse({
     status: 200,
     description: 'Rekening simpanan berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil rekening simpanan nasabah',
+          data: [
+            {
+              id: 11,
+              nasabahId: 1,
+              jenisSimpanan: 'SUKARELA',
+              saldoBerjalan: 2500000,
+            },
+          ],
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Nasabah tidak ditemukan')
   @ApiAuthErrors()
@@ -58,6 +73,19 @@ export class SimpananController {
   @ApiResponse({
     status: 200,
     description: 'Detail rekening simpanan berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil detail rekening simpanan',
+          data: {
+            id: 11,
+            nasabahId: 1,
+            jenisSimpanan: 'SUKARELA',
+            saldoBerjalan: 2500000,
+          },
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
   @ApiAuthErrors()
@@ -77,6 +105,23 @@ export class SimpananController {
   @ApiResponse({
     status: 201,
     description: 'Setoran simpanan berhasil dicatat',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Transaksi berhasil diproses',
+          data: {
+            id: 901,
+            nasabahId: 1,
+            pegawaiId: 2,
+            rekeningSimpananId: 11,
+            jenisTransaksi: 'SETORAN',
+            nominal: 200000,
+            tanggal: '2026-03-10T10:00:00.000Z',
+            metodePembayaran: 'TRANSFER',
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Saldo simpanan tidak mencukupi')
   @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
@@ -101,6 +146,23 @@ export class SimpananController {
   @ApiResponse({
     status: 201,
     description: 'Penarikan simpanan berhasil dicatat',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Transaksi berhasil diproses',
+          data: {
+            id: 902,
+            nasabahId: 1,
+            pegawaiId: 2,
+            rekeningSimpananId: 11,
+            jenisTransaksi: 'PENARIKAN',
+            nominal: 100000,
+            tanggal: '2026-03-10T10:30:00.000Z',
+            metodePembayaran: 'TUNAI',
+          },
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Saldo simpanan tidak mencukupi')
   @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
@@ -126,6 +188,27 @@ export class SimpananController {
   @ApiResponse({
     status: 200,
     description: 'Histori transaksi simpanan berhasil diambil',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Berhasil mengambil histori transaksi simpanan',
+          data: [
+            {
+              id: 901,
+              rekeningSimpananId: 11,
+              jenisTransaksi: 'SETORAN',
+              nominal: 200000,
+              tanggal: '2026-03-10T10:00:00.000Z',
+            },
+          ],
+          pagination: {
+            nextCursor: null,
+            limit: 20,
+            hasNext: false,
+          },
+        },
+      },
+    },
   })
   @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
   @ApiAuthErrors()
@@ -147,6 +230,13 @@ export class SimpananController {
   @ApiResponse({
     status: 200,
     description: 'Rekening simpanan berhasil dihapus (soft delete)',
+    content: {
+      'application/json': {
+        example: {
+          message: 'Rekening simpanan berhasil dihapus',
+        },
+      },
+    },
   })
   @ApiBadRequestExample('Rekening dengan saldo masih ada tidak dapat dihapus')
   @ApiNotFoundExample('Rekening simpanan tidak ditemukan')
