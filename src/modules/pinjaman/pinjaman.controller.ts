@@ -26,10 +26,9 @@ import {
   PencairanPinjamanDto,
   VerifikasiPinjamanDto,
 } from './dto';
-import { CurrentUser, Permissions, Roles } from '../../common/decorators';
+import { CurrentUser, Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import {
@@ -42,13 +41,12 @@ import type { Request } from 'express';
 
 @ApiTags('pinjaman')
 @Controller('pinjaman')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PinjamanController {
   constructor(private readonly pinjamanService: PinjamanService) {}
 
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff')
   @Permissions('pinjaman.ajukan')
   @ApiOperation({
     summary: 'Pengajuan pinjaman',
@@ -85,7 +83,6 @@ export class PinjamanController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('pinjaman.read')
   @ApiOperation({ summary: 'Dapatkan detail pinjaman' })
   @ApiResponse({
@@ -100,7 +97,6 @@ export class PinjamanController {
 
   @Get('nasabah/:nasabahId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('pinjaman.read')
   @ApiOperation({ summary: 'Dapatkan pinjaman per nasabah' })
   @ApiQuery({
@@ -123,7 +119,6 @@ export class PinjamanController {
 
   @Patch(':id/verifikasi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('pinjaman.verify')
   @ApiOperation({ summary: 'Verifikasi pinjaman' })
   @ApiBody({ type: VerifikasiPinjamanDto })
@@ -150,7 +145,6 @@ export class PinjamanController {
 
   @Post(':id/pencairan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Kasir')
   @Permissions('pinjaman.cairkan')
   @ApiOperation({
     summary: 'Catat pencairan pinjaman',
@@ -175,7 +169,6 @@ export class PinjamanController {
 
   @Post(':id/angsuran')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Kasir')
   @Permissions('pinjaman.angsuran')
   @ApiOperation({
     summary: 'Catat angsuran pinjaman',
@@ -200,7 +193,6 @@ export class PinjamanController {
 
   @Get(':id/transaksi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('pinjaman.read')
   @ApiOperation({ summary: 'Histori transaksi pinjaman' })
   @ApiQuery({
@@ -224,7 +216,6 @@ export class PinjamanController {
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('pinjaman.verify')
   @ApiOperation({
     summary: 'Soft delete pinjaman',
@@ -240,3 +231,4 @@ export class PinjamanController {
     return this.pinjamanService.softDeletePinjaman(id);
   }
 }
+

@@ -8,23 +8,21 @@ import {
 } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { DashboardPeriodDto } from './dto';
-import { Permissions, Roles } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
   PermissionsGuard,
-  RolesGuard,
 } from '../../common/guards';
 import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
 
 @ApiTags('dashboard')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Kasir', 'Pimpinan')
   @Permissions('dashboard.read')
   @ApiOperation({ summary: 'Ringkasan dashboard koperasi' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -91,3 +89,4 @@ export class DashboardController {
     return this.dashboardService.getDashboard(query.bulan, query.tahun);
   }
 }
+

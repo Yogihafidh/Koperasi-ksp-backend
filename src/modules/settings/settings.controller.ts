@@ -5,11 +5,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Permissions, Roles } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
   PermissionsGuard,
-  RolesGuard,
 } from '../../common/guards';
 import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
 import { UpsertSettingDto } from './dto';
@@ -17,13 +16,12 @@ import { SettingsService } from './settings.service';
 
 @ApiTags('settings')
 @Controller('settings')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('settings.read')
   @ApiOperation({ summary: 'Daftar seluruh settings sistem' })
   @ApiResponse({
@@ -62,7 +60,6 @@ export class SettingsController {
 
   @Get(':key')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('settings.read')
   @ApiOperation({ summary: 'Detail setting berdasarkan key' })
   @ApiResponse({
@@ -91,7 +88,6 @@ export class SettingsController {
 
   @Put(':key')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('settings.update')
   @ApiOperation({ summary: 'Update setting sistem' })
   @ApiResponse({
@@ -103,3 +99,4 @@ export class SettingsController {
     return this.settingsService.updateSetting(key, dto);
   }
 }
+

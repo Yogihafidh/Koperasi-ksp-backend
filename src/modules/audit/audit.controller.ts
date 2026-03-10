@@ -7,11 +7,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AuditAction } from '@prisma/client';
-import { Permissions, Roles } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
   PermissionsGuard,
-  RolesGuard,
 } from '../../common/guards';
 import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
 import { AuditTrailService } from './audit.service';
@@ -19,13 +18,12 @@ import { ListAuditTrailQueryDto } from './dto/list-audit-trail-query.dto';
 
 @ApiTags('audit')
 @Controller('audit-trails')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AuditController {
   constructor(private readonly auditTrailService: AuditTrailService) {}
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('audit.read')
   @ApiOperation({
     summary: 'Dapatkan daftar audit trail',
@@ -57,7 +55,6 @@ export class AuditController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('audit.read')
   @ApiOperation({ summary: 'Dapatkan detail audit trail berdasarkan ID' })
   @ApiResponse({
@@ -69,3 +66,4 @@ export class AuditController {
     return this.auditTrailService.getAuditTrailById(id);
   }
 }
+

@@ -16,10 +16,9 @@ import {
 } from '@nestjs/swagger';
 import { LaporanService } from './laporan.service';
 import { LaporanPeriodDto } from './dto';
-import { CurrentUser, Permissions, Roles } from '../../common/decorators';
+import { CurrentUser, Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
@@ -27,13 +26,12 @@ import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('laporan')
 @Controller('laporan')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class LaporanController {
   constructor(private readonly laporanService: LaporanService) {}
 
   @Get('bulanan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan bulanan (executive summary)' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -84,7 +82,6 @@ export class LaporanController {
 
   @Get('transaksi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan transaksi lengkap' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -141,7 +138,6 @@ export class LaporanController {
 
   @Get('angsuran')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan angsuran' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -177,7 +173,6 @@ export class LaporanController {
 
   @Get('penarikan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan penarikan' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -213,7 +208,6 @@ export class LaporanController {
 
   @Get('pinjaman')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan pinjaman' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -249,7 +243,6 @@ export class LaporanController {
 
   @Get('simpanan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan simpanan' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -286,7 +279,6 @@ export class LaporanController {
 
   @Get('cashflow')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan cashflow' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -327,7 +319,6 @@ export class LaporanController {
 
   @Get('anggota')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Laporan anggota' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -369,7 +360,6 @@ export class LaporanController {
 
   @Post('keuangan/generate')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.generate')
   @ApiOperation({ summary: 'Generate laporan keuangan (snapshot)' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -412,7 +402,6 @@ export class LaporanController {
 
   @Get('keuangan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.read')
   @ApiOperation({ summary: 'Lihat laporan keuangan (snapshot)' })
   @ApiQuery({ name: 'bulan', required: true })
@@ -448,7 +437,6 @@ export class LaporanController {
 
   @Post('keuangan/:id/finalize')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan')
   @Permissions('laporan.finalize')
   @ApiOperation({ summary: 'Finalisasi laporan keuangan (snapshot)' })
   @ApiResponse({
@@ -480,3 +468,4 @@ export class LaporanController {
     return this.laporanService.finalizeLaporanKeuangan(id);
   }
 }
+

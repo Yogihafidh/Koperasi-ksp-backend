@@ -14,23 +14,21 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TransaksiService } from './transaksi.service';
-import { Permissions, Roles } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import { ApiAuthErrors } from '../../common/decorators/api-docs.decorator';
 
 @ApiTags('transaksi')
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TransaksiRelationsController {
   constructor(private readonly transaksiService: TransaksiService) {}
 
   @Get('rekening-simpanan/:id/transaksi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan', 'Staff', 'Kasir')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan transaksi per rekening simpanan',
@@ -77,7 +75,6 @@ export class TransaksiRelationsController {
 
   @Get('pinjaman/:id/transaksi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Pimpinan', 'Staff', 'Kasir')
   @Permissions('transaksi.read')
   @ApiOperation({
     summary: 'Dapatkan transaksi per pinjaman',
@@ -122,3 +119,4 @@ export class TransaksiRelationsController {
     return this.transaksiService.listTransaksiByPinjaman(id, cursor);
   }
 }
+

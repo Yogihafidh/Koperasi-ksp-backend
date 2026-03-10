@@ -17,7 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CreatePermissionDto } from './dto';
-import { Roles, Permissions } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -26,21 +26,19 @@ import {
 } from '../../common/decorators/api-docs.decorator';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import type { Request } from 'express';
 
 @ApiTags('permissions')
 @Controller('permissions')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PermissionsController {
   constructor(private readonly authService: AuthService) {}
 
   // ==================== PERMISSION MANAGEMENT ENDPOINTS ====================
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('permission.create')
   @ApiOperation({ summary: 'Buat permission baru (Admin only)' })
   @ApiResponse({
@@ -71,7 +69,6 @@ export class PermissionsController {
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('permission.read')
   @ApiOperation({ summary: 'Dapatkan semua permission (Admin only)' })
   @ApiResponse({
@@ -104,7 +101,6 @@ export class PermissionsController {
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('permission.delete')
   @ApiOperation({ summary: 'Hapus permission (Admin only)' })
   @ApiResponse({
@@ -124,3 +120,4 @@ export class PermissionsController {
     return this.authService.deletePermission(id);
   }
 }
+

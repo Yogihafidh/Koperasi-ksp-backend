@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AssignPermissionsDto, CreateRoleDto, UpdateRoleDto } from './dto';
-import { Roles, Permissions } from '../../common/decorators';
+import { Permissions } from '../../common/decorators';
 import {
   ApiAuthErrors,
   ApiBadRequestExample,
@@ -27,21 +27,19 @@ import {
 } from '../../common/decorators/api-docs.decorator';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import type { Request } from 'express';
 
 @ApiTags('roles')
 @Controller('roles')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
   constructor(private readonly authService: AuthService) {}
 
   // ==================== ROLE MANAGEMENT ENDPOINTS ====================
   @Post()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.create')
   @ApiOperation({ summary: 'Buat role baru (Admin only)' })
   @ApiResponse({
@@ -69,7 +67,6 @@ export class RolesController {
 
   @Get()
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.read')
   @ApiOperation({ summary: 'Dapatkan semua role (Admin only)' })
   @ApiResponse({
@@ -102,7 +99,6 @@ export class RolesController {
 
   @Get(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.read')
   @ApiOperation({ summary: 'Dapatkan role berdasarkan ID (Admin only)' })
   @ApiResponse({
@@ -129,7 +125,6 @@ export class RolesController {
 
   @Put(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.update')
   @ApiOperation({ summary: 'Update role (Admin only)' })
   @ApiResponse({
@@ -161,7 +156,6 @@ export class RolesController {
 
   @Delete(':id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.delete')
   @ApiOperation({ summary: 'Hapus role (Admin only)' })
   @ApiResponse({
@@ -184,7 +178,6 @@ export class RolesController {
   // ==================== ROLE-PERMISSION ASSIGNMENT ENDPOINTS ====================
   @Post(':id/permissions')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.update')
   @ApiOperation({ summary: 'Assign permissions ke role (Admin only)' })
   @ApiResponse({
@@ -215,7 +208,6 @@ export class RolesController {
 
   @Delete(':roleId/permissions/:permissionId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('role.update')
   @ApiOperation({ summary: 'Hapus permission dari role (Admin only)' })
   @ApiResponse({
@@ -243,3 +235,4 @@ export class RolesController {
     );
   }
 }
+

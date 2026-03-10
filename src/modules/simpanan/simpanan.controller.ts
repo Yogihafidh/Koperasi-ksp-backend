@@ -19,10 +19,9 @@ import {
 } from '@nestjs/swagger';
 import { SimpananService } from './simpanan.service';
 import { SimpananTransaksiDto } from './dto';
-import { CurrentUser, Permissions, Roles } from '../../common/decorators';
+import { CurrentUser, Permissions } from '../../common/decorators';
 import {
   JwtAuthGuard,
-  RolesGuard,
   PermissionsGuard,
 } from '../../common/guards';
 import {
@@ -34,13 +33,12 @@ import type { UserFromJwt } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('simpanan')
 @Controller('simpanan')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SimpananController {
   constructor(private readonly simpananService: SimpananService) {}
 
   @Get('nasabah/:nasabahId')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('simpanan.read')
   @ApiOperation({ summary: 'Dapatkan rekening simpanan nasabah' })
   @ApiResponse({
@@ -55,7 +53,6 @@ export class SimpananController {
 
   @Get('rekening/:id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('simpanan.read')
   @ApiOperation({ summary: 'Dapatkan detail rekening simpanan' })
   @ApiResponse({
@@ -70,7 +67,6 @@ export class SimpananController {
 
   @Post('rekening/:id/setoran')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('simpanan.setor')
   @ApiOperation({
     summary: 'Catat setoran simpanan',
@@ -95,7 +91,6 @@ export class SimpananController {
 
   @Post('rekening/:id/penarikan')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Kasir')
   @Permissions('simpanan.tarik')
   @ApiOperation({
     summary: 'Catat penarikan simpanan',
@@ -120,7 +115,6 @@ export class SimpananController {
 
   @Get('rekening/:id/transaksi')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin', 'Staff', 'Pimpinan', 'Kasir')
   @Permissions('simpanan.read')
   @ApiOperation({ summary: 'Histori transaksi simpanan' })
   @ApiQuery({
@@ -144,7 +138,6 @@ export class SimpananController {
 
   @Delete('rekening/:id')
   @ApiBearerAuth('JWT-auth')
-  @Roles('Admin')
   @Permissions('simpanan.read')
   @ApiOperation({
     summary: 'Soft delete rekening simpanan',
@@ -162,3 +155,4 @@ export class SimpananController {
     return this.simpananService.softDeleteRekening(id);
   }
 }
+
