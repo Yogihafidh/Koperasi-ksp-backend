@@ -457,9 +457,16 @@ export class AuthService {
   async getAllRoles() {
     const roles = await this.authRepository.findAllRoles();
 
+    const summarizedRoles = roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      totalUsers: role._count.users,
+    }));
+
     return {
       message: 'Berhasil mengambil data role',
-      data: roles,
+      data: summarizedRoles,
     };
   }
 
@@ -470,9 +477,20 @@ export class AuthService {
       throw new NotFoundException('Role tidak ditemukan');
     }
 
+    const permissions = role.permissions.map(
+      (rolePermission) => rolePermission.permission.code,
+    );
+    const users = role.users.map((userRole) => userRole.user);
+
     return {
-      message: 'Berhasil mengambil data role',
-      data: role,
+      message: 'Berhasil mengambil detail role',
+      data: {
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        permissions,
+        users,
+      },
     };
   }
 
@@ -588,9 +606,15 @@ export class AuthService {
   async getAllPermissions() {
     const permissions = await this.authRepository.findAllPermissions();
 
+    const summarizedPermissions = permissions.map((permission) => ({
+      id: permission.id,
+      code: permission.code,
+      description: permission.description,
+    }));
+
     return {
       message: 'Berhasil mengambil data permission',
-      data: permissions,
+      data: summarizedPermissions,
     };
   }
 

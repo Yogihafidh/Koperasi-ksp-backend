@@ -179,7 +179,19 @@ describe('Auth RBAC (Integration)', () => {
         `/api/roles/${testRoleId}`,
         adminToken,
       ).expect(200);
-      const permId = roleRes.body.data.permissions[0].permissionId;
+
+      const permissionCode = roleRes.body.data.permissions[0];
+      const permissionsRes = await authGet(
+        app,
+        '/api/permissions',
+        adminToken,
+      ).expect(200);
+      const permId = permissionsRes.body.data.find(
+        (permission: { id: number; code: string }) =>
+          permission.code === permissionCode,
+      )?.id;
+
+      expect(permId).toBeDefined();
 
       await authDelete(
         app,

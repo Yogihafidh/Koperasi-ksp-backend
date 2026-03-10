@@ -271,15 +271,7 @@ export class AuthRepository {
 
   // Find all permissions
   async findAllPermissions() {
-    return this.prisma.permission.findMany({
-      include: {
-        _count: {
-          select: {
-            roles: true,
-          },
-        },
-      },
-    });
+    return this.prisma.permission.findMany();
   }
 
   // Find permission by ID
